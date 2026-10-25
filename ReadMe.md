@@ -110,3 +110,7 @@ pm2-startup install
 pm2 start "C:\Global-AI-Notifier\watcher.js" --name "ai-terminal-notifier"
 pm2 save
 ```
+
+6. If the popup notification does not show then right click on the notification icon, click on focus assist dropdown and select off
+![alt text](image.png)
+![alt text](image-1.png)

@@ -1,90 +1,78 @@
-const chokidar = require('chokidar');
-const fs = require('fs');
-const { exec } = require('child_process');
+// watcher.js
+const fs = require("fs");
+const path = require("path");
+const { exec } = require("child_process");
+const chokidar = require("chokidar");
 
-// Watch full_terminal.log which captures all VS Code terminal & TUI output
-const logFilePath = 'C:\\Global-AI-Notifier\\logs\\full_terminal.log';
+// ১. BurntToast দিয়ে Windows Native Toast Banner পাঠানোর ফাংশন
+function sendGlobalToast(title, message) {
+  const cleanTitle = title.replace(/"/g, '`"');
+  const cleanMessage = message.replace(/"/g, '`"');
 
-console.log(`[Watcher Engine Started] Monitoring: ${logFilePath}`);
+  // PowerShell Array Syntax ব্যবহার করে সঠিক কমান্ড ট্রিগার করা
+  const command = `powershell -ExecutionPolicy Bypass -Command "New-BurntToastNotification -Text @(\\"${cleanTitle}\\", \\"${cleanMessage}\\")"`;
 
-let lastFileSize = 0;
+  exec(command, (err) => {
+    if (err) {
+      console.error("❌ BurntToast Error:", err);
+    }
+  });
 
-// Initialize file size to prevent triggering notifications for existing logs on startup
-if (fs.existsSync(logFilePath)) {
-    lastFileSize = fs.statSync(logFilePath).size;
+  console.log(`🔔 [BurntToast Banner Sent]: ${title} - ${message}`);
 }
 
-// Function to send Windows Toast Notification via PowerShell (BurntToast)
-function sendNotification(title, message) {
-    const psCommand = `PowerShell -Command "New-BurntToastNotification -Text '${title}', '${message}'"`;
-    
-    exec(psCommand, (error) => {
-        if (error) {
-            console.error(`[Error] Failed to send notification: ${error.message}`);
-        } else {
-            console.log(`[Notification Sent] ${title}: ${message}`);
-        }
-    });
+// ২. লগের ফোল্ডার ও ফাইল প্যাথ
+const watchFolder = "C:\\Global-AI-Notifier\\logs";
+const targetFile = path.join(watchFolder, "terminal.log");
+
+// ফোল্ডার না থাকলে স্বয়ংক্রিয়ভাবে তৈরি করা
+if (!fs.existsSync(watchFolder)) {
+  fs.mkdirSync(watchFolder, { recursive: true });
 }
 
-// Watch file changes in real-time
-chokidar.watch(logFilePath, {
-    persistent: true,
-    usePolling: true,
-    interval: 500
-}).on('change', (filePath) => {
-    fs.stat(filePath, (err, stats) => {
-        if (err) return;
+console.log(`👀 Background watcher is running...`);
+console.log(`📄 Monitoring log file: ${targetFile}`);
 
-        // Read only the newly appended content
-        const stream = fs.createReadStream(filePath, {
-            start: lastFileSize,
-            end: stats.size,
-            encoding: 'utf8'
-        });
+// ৩. ফাইল কনটেন্ট পড়া এবং প্রসেস করা
+function processFileContent(filePath) {
+  setTimeout(() => {
+    fs.readFile(filePath, "utf8", (err, data) => {
+      if (err) {
+        console.error("❌ Error reading log file:", err);
+        return;
+      }
 
-        let newContent = '';
-        stream.on('data', (chunk) => {
-            newContent += chunk;
-        });
+      const logText = data.trim();
+      if (!logText) return;
 
-        stream.on('end', () => {
-            lastFileSize = stats.size;
+      console.log(`\n📥 Log Content Detected:\n"${logText}"`);
 
-            if (!newContent.trim()) return;
+      const textLower = logText.toLowerCase();
 
-            const lowerContent = newContent.toLowerCase();
-
-            // 1. Task Completion Triggers
-            if (
-                lowerContent.includes('task completed') || 
-                lowerContent.includes('finished successfully') || 
-                lowerContent.includes('process done') ||
-                lowerContent.includes('done!')
-            ) {
-                sendNotification('AI Task Completed', 'Freebuff/AGY has finished the execution.');
-            }
-
-            // 2. User Input / Prompt Required Triggers
-            else if (
-                lowerContent.includes('(y/n)') || 
-                lowerContent.includes('allow') || 
-                lowerContent.includes('confirm') || 
-                lowerContent.includes('enter a coding task') ||
-                lowerContent.includes('press enter') ||
-                lowerContent.includes('?')
-            ) {
-                sendNotification('Action Required', 'Freebuff is waiting for your confirmation/input!');
-            }
-
-            // 3. Error Triggers
-            else if (
-                lowerContent.includes('error:') || 
-                lowerContent.includes('failed to') || 
-                lowerContent.includes('exception')
-            ) {
-                sendNotification('Execution Error', 'An error was detected in the terminal output.');
-            }
-        });
+      // আরও নমনীয় ও আপডেট করা কিওয়ার্ড ম্যাচিং লজিক
+      if (textLower.includes("success") || textLower.includes("complete") || textLower.includes("finished")) {
+        sendGlobalToast("Task Successful", "Terminal task completed successfully!");
+      } else if (
+        textLower.includes("y/n") ||
+        textLower.includes("?") ||
+        textLower.includes("allow") ||
+        textLower.includes("confirm") ||
+        textLower.includes("proceed")
+      ) {
+        sendGlobalToast("Input Required", "Terminal is waiting for your permission/input.");
+      } else if (textLower.includes("error") || textLower.includes("failed") || textLower.includes("exception")) {
+        sendGlobalToast("Task Error", "An error was logged in terminal output.");
+      }
     });
+  }, 100);
+}
+
+// ৪. Chokidar File Watcher
+const watcher = chokidar.watch(targetFile, {
+  persistent: true,
+  usePolling: true,
+  interval: 100,
 });
+
+watcher.on("add", (filePath) => processFileContent(filePath));
+watcher.on("change", (filePath) => processFileContent(filePath));
