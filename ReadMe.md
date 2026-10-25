@@ -114,3 +114,53 @@ pm2 save
 6. If the popup notification does not show then right click on the notification icon, click on focus assist dropdown and select off
 ![alt text](image.png)
 ![alt text](image-1.png)
+
+7. VS Code er powershell diye ja likhbo ta e jaate log e dekhay:
+
+  1. VS Code-এর টার্মিনালের একদম উপরে ডান কোণায় + (Plus) আইকনের পাশে ছোট Down Arrow (˅)-তে ক্লিক করুন।
+  2. Select Default Profile-এ ক্লিক করুন।
+  3. লিস্ট থেকে PowerShell সিলেক্ট করে দিন।
+  4. VS Code-এ `Ctrl + ,` চাপুন (Settings খুলবে)।
+  5. সার্চ বারে লিখুন: `terminal.integrated.profiles.windows`
+  6. `"Edit in settings.json"`-এ ক্লিক করুন।
+  7. আপনার `settings.json` ফাইলের ভেতরে `terminal.integrated.profiles.windows` সেকশনে PowerShell-এর জন্য args খালি বা সঠিক আছে কিনা তা নিশ্চিত করুন (যেন -NoProfile ফ্ল্যাগ না থাকে):
+
+  ```json
+  "terminal.integrated.profiles.windows": {
+    "PowerShell": {
+        "source": "PowerShell",
+        "icon": "terminal-powershell"
+    },
+    "Command Prompt": {
+        "path": [
+            "${env:windir}\\Sysnative\\cmd.exe",
+            "${env:windir}\\System32\\cmd.exe"
+        ],
+        "args": [],
+        "icon": "terminal-cmd"
+    },
+    "Git Bash": {
+        "source": "Git Bash",
+        "icon": "terminal-git-bash"
+    }
+}
+  ```
+
+  8. VS Code-এর PowerShell টার্মিনালে এই কমান্ডটি লিখে Enter দিন: `notepad $PROFILE`
+  9. erpor likhun
+
+  ```cmd
+  Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser -Force
+
+# Auto-append Start-Transcript to VS Code's active profile
+$transcriptCode = @"
+`$transcriptDir = "C:\Global-AI-Notifier\logs"
+if (-not (Test-Path `$transcriptDir)) { New-Item -ItemType Directory -Path `$transcriptDir -Force | Out-Null }
+`$transcriptPath = "`$transcriptDir\full_terminal.log"
+try { Stop-Transcript | Out-Null } catch {}
+Start-Transcript -Path `$transcriptPath -Append -NoClobber -ErrorAction SilentlyContinue | Out-Null
+"@
+
+Add-Content -Path $PROFILE -Value $transcriptCode
+``` 
+  10. প্রোফাইলটি ম্যানুয়ালি লোড করে টেস্ট করুন: `. $PROFILE`
