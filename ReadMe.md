@@ -244,3 +244,9 @@ function freebuff {
 }
 ``` 
   10. প্রোফাইলটি ম্যানুয়ালি লোড করে টেস্ট করুন: `. $PROFILE`
+
+11. If you do any changes in the watcher.js, restart the background system by writing down the following command in the terminal
+
+```cmd
+pm2 restart ai-terminal-notifier
+```
