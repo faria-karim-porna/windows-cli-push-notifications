@@ -1,40 +1,61 @@
 const chokidar = require('chokidar');
 const fs = require('fs');
-const { exec } = require('child_process');
+const notifier = require('node-notifier');
 
 const logFilePath = 'C:\\Global-AI-Notifier\\logs\\full_terminal.log';
 
-console.log(`[Watcher Engine Started] Monitoring: ${logFilePath}`);
+console.log(`[Watcher Engine Started] Monitoring terminal logs: ${logFilePath}`);
 
 let lastFileSize = 0;
+let idleTimer = null;
+let isProcessing = false;        // Tracks if AI is currently thinking/working
+let notificationTriggered = false; // Prevents repeated notifications on idle
 
 if (fs.existsSync(logFilePath)) {
     lastFileSize = fs.statSync(logFilePath).size;
 }
 
-function sendNotification(title, message) {
-    const psCommand = `PowerShell -Command "New-BurntToastNotification -Text '${title}', '${message}'"`;
-    
-    exec(psCommand, (error) => {
-        if (error) {
-            console.error(`[Error] Failed to send notification: ${error.message}`);
-        } else {
-            console.log(`[Notification Sent] ${title}: ${message}`);
+function triggerSuccessNotification(reason) {
+    if (notificationTriggered) return;
+
+    notificationTriggered = true;
+    isProcessing = false;
+    clearTimeout(idleTimer);
+
+    // Terminal beep sound
+    process.stdout.write('\x07');
+
+    notifier.notify(
+        {
+            title: 'Freebuff Task Completed',
+            message: `Execution finished (${reason})`,
+            sound: true,
+            wait: false,
+            appID: 'Global AI Notifier'
+        },
+        (err) => {
+            if (!err) {
+                console.log(`\n[Notification Sent] Triggered by: ${reason}`);
+            }
         }
-    });
+    );
 }
 
 chokidar.watch(logFilePath, {
     persistent: true,
     usePolling: true,
-    interval: 500
+    interval: 300
 }).on('change', (filePath) => {
     fs.stat(filePath, (err, stats) => {
         if (err) return;
 
-        // If log file was truncated/cleared, reset lastFileSize to 0
+        // Reset state if log is cleared for a new session
         if (stats.size < lastFileSize) {
             lastFileSize = 0;
+            isProcessing = false;
+            notificationTriggered = false;
+            clearTimeout(idleTimer);
+            console.log('\n[Watcher] New session detected. Resetting state.');
         }
 
         if (stats.size === lastFileSize) return;
@@ -52,17 +73,39 @@ chokidar.watch(logFilePath, {
 
         stream.on('end', () => {
             lastFileSize = stats.size;
-
             if (!newContent.trim()) return;
 
             const cleanContent = newContent.replace(/\x1B\[[0-9;]*[a-zA-K]/g, '').toLowerCase();
 
-            // Check if session has ended
-            if (cleanContent.includes('end session') || cleanContent.includes('✕ end session')) {
-                sendNotification('Session Success', 'Freebuff session has ended successfully!');
+            // Detect active processing state
+            if (
+                cleanContent.includes('thinking') || 
+                cleanContent.includes('working') || 
+                cleanContent.includes('starting your model session')
+            ) {
+                isProcessing = true;
+                notificationTriggered = false; // Reset lock for the current task
+                clearTimeout(idleTimer);
             }
-            else if (cleanContent.includes('task completed') || cleanContent.includes('finished')) {
-                sendNotification('AI Task Completed', 'Freebuff has finished the task execution.');
+
+            // Only evaluate end triggers if the model was actively processing
+            if (isProcessing && !notificationTriggered) {
+                // 1. Direct Pattern Match on Task Completion
+                if (
+                    cleanContent.includes('✕ end session') || 
+                    cleanContent.includes('enter a coding task') ||
+                    cleanContent.includes('add to the current task')
+                ) {
+                    triggerSuccessNotification('Pattern Matched');
+                } else {
+                    // 2. Idle Backup: Trigger if output stops for 3 seconds after active response
+                    clearTimeout(idleTimer);
+                    idleTimer = setTimeout(() => {
+                        if (isProcessing && !notificationTriggered) {
+                            triggerSuccessNotification('Terminal Idle After Work');
+                        }
+                    }, 3000);
+                }
             }
         });
 

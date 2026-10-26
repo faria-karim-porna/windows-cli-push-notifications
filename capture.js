@@ -1,6 +1,7 @@
 const pty = require('node-pty');
 const fs = require('fs');
 const path = require('path');
+const notifier = require('node-notifier');
 
 const command = process.argv[2];
 const args = process.argv.slice(3);
@@ -16,7 +17,23 @@ if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
 }
 
-// Spawn pseudo terminal using cmd.exe to correctly resolve global CLI tools (like freebuff or agy)
+// Function to send Native Windows Toast Notification using node-notifier
+function sendSuccessNotification() {
+    notifier.notify({
+        title: 'Session Success',
+        message: 'Freebuff session has completed successfully!',
+        sound: true, // Play default notification sound
+        wait: false
+    });
+    console.log('[Notification Sent] Session Success via node-notifier');
+}
+
+// FRESH START: Clear previous logs immediately when freebuff/agy starts
+try {
+    fs.writeFileSync(logFile, '', 'utf8');
+} catch (e) {}
+
+// Spawn pseudo terminal using cmd.exe
 const ptyProcess = pty.spawn('cmd.exe', ['/c', command, ...args], {
     name: 'xterm-color',
     cols: process.stdout.columns || 80,
@@ -25,26 +42,22 @@ const ptyProcess = pty.spawn('cmd.exe', ['/c', command, ...args], {
     env: process.env
 });
 
-// Write terminal output to full_terminal.log and render to screen safely
+// LIVE LOGGING: Write output to full_terminal.log and render to screen
 ptyProcess.onData((data) => {
-    // Strip ANSI escape codes to keep log text clean and readable
     const cleanText = data.replace(/\x1B\[[0-9;]*[a-zA-K]/g, '');
     try {
         fs.appendFileSync(logFile, cleanText, 'utf8');
-    } catch (e) {
-        // Silently handle file write locks
-    }
+    } catch (e) {}
     process.stdout.write(data);
 });
 
-// Handle user keyboard inputs
+// USER INPUT HANDLING: Pass keyboard events to PTY
 if (process.stdin.isTTY) {
     process.stdin.setRawMode(true);
 }
 
 process.stdin.on('data', (key) => {
-    // Graceful exit on Ctrl+C
-    if (key.toString() === '\u0003') {
+    if (key.toString() === '\u0003') { // Ctrl+C
         ptyProcess.kill();
         process.exit();
     }
@@ -53,6 +66,10 @@ process.stdin.on('data', (key) => {
     } catch (e) {}
 });
 
+// PROCESS EXIT EVENT: Trigger success notification if exitCode is 0
 ptyProcess.onExit(({ exitCode }) => {
+    if (exitCode === 0) {
+        sendSuccessNotification();
+    }
     process.exit(exitCode);
 });
