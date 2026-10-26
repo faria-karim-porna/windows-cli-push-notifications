@@ -102,7 +102,71 @@ watcher.on('add', (filePath) => processFileContent(filePath));
 watcher.on('change', (filePath) => processFileContent(filePath));
 ```
 
-5. Write the following command in any terminal to run it in background from any project
+5. new file `capture.js` create korun
+6. `capture.js` e nicher code ta likhun
+
+```js
+const pty = require('node-pty');
+const fs = require('fs');
+const path = require('path');
+
+const command = process.argv[2];
+const args = process.argv.slice(3);
+const logDir = 'C:\\Global-AI-Notifier\\logs';
+const logFile = path.join(logDir, 'full_terminal.log');
+
+if (!command) {
+    console.error('No command specified.');
+    process.exit(1);
+}
+
+if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+}
+
+// Spawn pseudo terminal using cmd.exe to correctly resolve global CLI tools (like freebuff or agy)
+const ptyProcess = pty.spawn('cmd.exe', ['/c', command, ...args], {
+    name: 'xterm-color',
+    cols: process.stdout.columns || 80,
+    rows: process.stdout.rows || 30,
+    cwd: process.cwd(),
+    env: process.env
+});
+
+// Write terminal output to full_terminal.log and render to screen safely
+ptyProcess.onData((data) => {
+    // Strip ANSI escape codes to keep log text clean and readable
+    const cleanText = data.replace(/\x1B\[[0-9;]*[a-zA-K]/g, '');
+    try {
+        fs.appendFileSync(logFile, cleanText, 'utf8');
+    } catch (e) {
+        // Silently handle file write locks
+    }
+    process.stdout.write(data);
+});
+
+// Handle user keyboard inputs
+if (process.stdin.isTTY) {
+    process.stdin.setRawMode(true);
+}
+
+process.stdin.on('data', (key) => {
+    // Graceful exit on Ctrl+C
+    if (key.toString() === '\u0003') {
+        ptyProcess.kill();
+        process.exit();
+    }
+    try {
+        ptyProcess.write(key);
+    } catch (e) {}
+});
+
+ptyProcess.onExit(({ exitCode }) => {
+    process.exit(exitCode);
+});
+```
+
+7. Write the following command in any terminal to run it in background from any project
 
 ```cmd
 npm install -g pm2 pm2-windows-startup
@@ -111,19 +175,29 @@ pm2 start "C:\Global-AI-Notifier\watcher.js" --name "ai-terminal-notifier"
 pm2 save
 ```
 
-6. If the popup notification does not show then right click on the notification icon, click on focus assist dropdown and select off
+8. Write the following command in the terminal to print text inside the TUI in the log
+
+```cmd
+npm install node-pty
+```
+
+8. If the popup notification does not show then right click on the notification icon, click on focus assist dropdown and select off
 ![alt text](image.png)
 ![alt text](image-1.png)
 
-7. VS Code er powershell diye ja likhbo ta e jaate log e dekhay:
+9. VS Code er powershell diye ja likhbo ta e jaate log e dekhay:
 
   1. VS Code-এর টার্মিনালের একদম উপরে ডান কোণায় + (Plus) আইকনের পাশে ছোট Down Arrow (˅)-তে ক্লিক করুন।
   2. Select Default Profile-এ ক্লিক করুন।
-  3. লিস্ট থেকে PowerShell সিলেক্ট করে দিন।
-  4. VS Code-এ `Ctrl + ,` চাপুন (Settings খুলবে)।
-  5. সার্চ বারে লিখুন: `terminal.integrated.profiles.windows`
-  6. `"Edit in settings.json"`-এ ক্লিক করুন।
-  7. আপনার `settings.json` ফাইলের ভেতরে `terminal.integrated.profiles.windows` সেকশনে PowerShell-এর জন্য args খালি বা সঠিক আছে কিনা তা নিশ্চিত করুন (যেন -NoProfile ফ্ল্যাগ না থাকে):
+  3. Jodi Select Default Profile e Powershell select na kora jay tahole:
+    1. VS Code-এ `Ctrl + Shift + P` চাপুন (Command Palette ওপেন হবে)।
+    2. টাইপ করুন: `Preferences: Open User Settings (JSON)` এবং `Enter` দিন।
+    3. File e `terminal.integrated.defaultProfile.windows` search korun r er value `PowerShell` din
+  4. লিস্ট থেকে PowerShell সিলেক্ট করে দিন।
+  5. VS Code-এ `Ctrl + ,` চাপুন (Settings খুলবে)।
+  6. সার্চ বারে লিখুন: `terminal.integrated.profiles.windows`
+  7. `"Edit in settings.json"`-এ ক্লিক করুন।
+  8. আপনার `settings.json` ফাইলের ভেতরে `terminal.integrated.profiles.windows` সেকশনে PowerShell-এর জন্য args খালি বা সঠিক আছে কিনা তা নিশ্চিত করুন (যেন -NoProfile ফ্ল্যাগ না থাকে):
 
   ```json
   "terminal.integrated.profiles.windows": {
@@ -150,17 +224,23 @@ pm2 save
   9. erpor likhun
 
   ```cmd
-  Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser -Force
+# Set execution policy
+Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser -Force
 
-# Auto-append Start-Transcript to VS Code's active profile
-$transcriptCode = @"
-`$transcriptDir = "C:\Global-AI-Notifier\logs"
-if (-not (Test-Path `$transcriptDir)) { New-Item -ItemType Directory -Path `$transcriptDir -Force | Out-Null }
-`$transcriptPath = "`$transcriptDir\full_terminal.log"
-try { Stop-Transcript | Out-Null } catch {}
-Start-Transcript -Path `$transcriptPath -Append -NoClobber -ErrorAction SilentlyContinue | Out-Null
-"@
+# Log directory setup
+$globalLogDir = "C:\Global-AI-Notifier\logs"
+if (-not (Test-Path $globalLogDir)) { 
+    New-Item -ItemType Directory -Path $globalLogDir -Force | Out-Null 
+}
 
-Add-Content -Path $PROFILE -Value $transcriptCode
+# --- CLI Wrappers using Node-PTY (capture.js) ---
+
+function agy {
+    node "C:\Global-AI-Notifier\capture.js" agy $args
+}
+
+function freebuff {
+    node "C:\Global-AI-Notifier\capture.js" freebuff $args
+}
 ``` 
   10. প্রোফাইলটি ম্যানুয়ালি লোড করে টেস্ট করুন: `. $PROFILE`
