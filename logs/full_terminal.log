@@ -1,26 +1,164 @@
-**********************
-PowerShell transcript start
-Start time: 20261026011407
-Username: DESKTOP-54ATNKA\User
-RunAs User: DESKTOP-54ATNKA\User
-Configuration Name: 
-Machine: DESKTOP-54ATNKA (Microsoft Windows NT 10.0.19045.0)
-Host Application: C:\Program Files\PowerShell\7\pwsh.dll -noexit -command try { . "c:\Users\User\AppData\Local\Programs\Microsoft VS Code\e646868227\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1" } catch {}
-Process ID: 18820
-PSVersion: 7.4.21
-PSEdition: Core
-GitCommitId: 7.4.21
-OS: Microsoft Windows 10.0.19045
-Platform: Win32NT
-PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
-PSRemotingProtocolVersion: 2.3
-SerializationVersion: 1.1.0.1
-WSManStackVersion: 3.0
-**********************
-PS>try { . "c:\Users\User\AppData\Local\Programs\Microsoft VS Code\e646868227\resources\app\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration.ps1" } catch {}
-]633;A]633;P;Cwd=C:\x5cGlobal-AI-NotifierPS C:\Global-AI-Notifier> ]633;B
-PS>freebuff
+]0;C:\Windows\system32\cmd.exe [?25h[?2031h]10;?]11;?[>0q[?1016$p[?2027$p[?2031$p[?1004$p[?2004$p[?2026$p[?u]99;i=opentui-notifications:p=?;\]1337;Capabilities\]66;w=1; \]66;s=2; \[?25l[>4;1m[?2027h[?2004h
 
-To continue this session later, run:
-freebuff --continue 2026-10-25T19-14-15.067Z
-]633;D;0]633;A]633;P;Cwd=C:\x5cGlobal-AI-NotifierPS C:\Global-AI-Notifier> ]633;B
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+]0;Windows PowerShell[?25h[?2026h[?2026l ███████████                        ██                 ▄████  ▄██
+ ███▀▀▀▀▀▀▀▀                        ██                 ██    ██▀
+ ███ █████  ██████ ▄█████   ▄████▄  ██████▄  ██   ██ ████████████
+ ███ ███▀▀  ██▀   ███▄▄▄██ ██▄▄▄███ ██   ▀██ ██   ██   ██    ██
+ ███ ███    ███   ███▀▀▀▀▀ ██▀▀▀▀▀  ██▄  ▄██ ██▄  ██   ██    ██
+ ███ ██▀    ██▀    ▀█████   ▀████▀  ██████▀   ▀████▀   ██    ██
+
+ ┌──────────────────────────────────────────────────────────────────┐
+ │ Your first message starts the session.[27X│
+ │ Some models aren't available on this connection[18X│
+ └──────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+││
+│  ▍Enter a coding task or / for commands│
+││
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ GLM 5.3 Flash • high · C:\Global-AI-Notifier · /model to change · Chat: New chat
+ ← for history · ? for help[?25l[?2027h[?2004h[?2027h[?2004h[?2027h[?2004h[?2027h[?2004h
+Gi=31337,s=1,v=1,a=q,t=d,f=24;AAAA[?2026h[?2026l ███████████                        ██                 ▄████  ▄██
+ ███▀▀▀▀▀▀▀▀                        ██                 ██    ██▀
+ ███ █████  ██████ ▄█████   ▄████▄  ██████▄  ██   ██ ████████████
+ ███ ███▀▀  ██▀   ███▄▄▄██ ██▄▄▄███ ██   ▀██ ██   ██   ██    ██
+ ███ ███    ███   ███▀▀▀▀▀ ██▀▀▀▀▀  ██▄  ▄██ ██▄  ██   ██    ██
+ ███ ██▀    ██▀    ▀█████   ▀████▀  ██████▀   ▀████▀   ██    ██
+
+ ┌──────────────────────────────────────────────────────────────────┐
+ │ Your first message starts the session.[27X│
+ │ Some models aren't available on this connection[18X│
+ └──────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+││
+│  ▍Enter a coding task or / for commands│
+││
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ GLM 5.3 Flash • high · C:\Global-AI-Notifier · /model to change · Chat: New chat
+ ← for history · ? for help[?1004h[?2027h[?2004h[?2026h[?2026l ███████████                        ██                 ▄████  ▄██
+ ███▀▀▀▀▀▀▀▀                        ██                 ██    ██▀
+ ███ █████  ██████ ▄█████   ▄████▄  ██████▄  ██   ██ ████████████
+ ███ ███▀▀  ██▀   ███▄▄▄██ ██▄▄▄███ ██   ▀██ ██   ██   ██    ██
+ ███ ███    ███   ███▀▀▀▀▀ ██▀▀▀▀▀  ██▄  ▄██ ██▄  ██   ██    ██
+ ███ ██▀    ██▀    ▀█████   ▀████▀  ██████▀   ▀████▀   ██    ██
+
+ ┌──────────────────────────────────────────────────────────────────┐
+ │ Your first message starts the session.[27X│
+ │ Some models aren't available on this connection[18X│
+ └──────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+││
+│  ▍Enter a coding task or / for commands│
+││
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ GLM 5.3 Flash • high · C:\Global-AI-Notifier · /model to change · Chat: New chat
+ ← for history · ? for help[?2026h[?2026l███▀▀▀▀▀▀▀▀                        ██                 ██    ██▀███ █████  ██████ ▄█████   ▄████▄  ██████▄  ██   ██ ███████████████ ███▀▀  ██▀   ███▄▄▄██ ██▄▄▄███ ██   ▀██ ██   ██   ██    █████ ███    ███   ███▀▀▀▀▀ ██▀▀▀▀▀  ██▄  ▄██ ██▄  ██   ██    █████ ██▀    ██▀    ▀█████   ▀████▀  ██████▀   ▀████▀   ██    ██
+┌──────────────────────────────────────────────────────────────────┐│ Your first message starts the session.[27X││ Some models aren't available on this connection[18X│└──────────────────────────────────────────────────────────────────┘
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮│ Product Analytics for engineers[101X Ad [Report 1] ││ No credit card needed, no quick calls, no dental records. LFG.[85X││  Get HogPilled  posthog.com[120X│╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯[?2026h[?2026l 
+ 
+ 
+ 
+ 
+▄
+█
+█
+█
+█
+█[?2026h[?2026l███ ██▀    ██▀    ▀█████   ▀████▀  ██████▀   ▀████▀   ██    ██  ┌──────────────────────────────────────────────────────────────────┐ │ Your first message starts the session.[27X│ │ 5/5 hours remaining[46X│ │[66X│ │ ✦ Refer friends → earn hours:[36X│ │[66X│ │ ⎘ Copy invite link  Learn More ↵[33X│ └──────────────────────────────────────────────────────────────────┘▄[?2026h[?2026lW▍[36X[?2026h[?2026lh▍[?2026h[?2026li▍[?2026h[?2026lc▍[?2026h[?2026lh▍[?2026h[?2026l ▍[?2026h[?2026lm▍[?2026h[?2026lo▍[?2026h[?2026ld▍[?2026h[?2026le▍[?2026h[?2026ll▍[?2026h[?2026l ▍[?2026h[?2026ly▍[?2026h[?2026lo▍[?2026h[?2026lu▍[?2026h[?2026l ▍[?2026h[?2026la▍[?2026h[?2026lr▍[?2026h[?2026le▍[?2026h[?2026l?▍]0;Freebuff: Which model you are?[?2026h[?2026l
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Starting your model session… Your message is saved.│
+│ Esc: back to draft│
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘[?2026h[?2026l ███ ███    ███   ███▀▀▀▀▀ ██▀▀▀▀▀  ██▄  ▄██ ██▄  ██   ██    ██ 
+ ███ ██▀    ██▀    ▀█████   ▀████▀  ██████▀   ▀████▀   ██    ██ 
+ 
+ ┌──────────────────────────────────────────────────────────────────┐ 
+ │ Session active[51X│▄
+ │ 1/5 hours remaining[46X│█
+ └──────────────────────────────────────────────────────────────────┘█
+█
+   [10:35 AM]█
+   Which model you are? ⎘█
+ ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ 
+ │ Product Analytics for engineers[101X Ad [Report 1] │ 
+ │ No credit card needed, no quick calls, no dental records. LFG.[85X│ 
+ │  Get HogPilled  posthog.com[120X│ 
+ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯ 
+ 1h left[129X✕ End session  
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+││
+│  ▍Add to the current task (/ for commands)│
+││
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ GLM 5.3 Flash • high · C:\Global-AI-Notifier · /model to change · Chat: Which model you are?[?2026h[?2026l███ ██▀    ██▀    ▀█████   ▀████▀  ██████▀   ▀████▀   ██    ██
+┌──────────────────────────────────────────────────────────────────┐│ Session active[51X││ 1/5 hours remaining[46X│└──────────────────────────────────────────────────────────────────┘
+  [10:35 AM]  Which model you are? ⎘
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ │ Product Analytics for engineers[101X Ad [Report 1] │ │ No credit card needed, no quick calls, no dental records. LFG.[85X│ │  Get HogPilled  posthog.com[120X│ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯ thinking...[133X■ Esc  [?2026h[?2026lhinking...[?2026h[?2026lthinking...[?2026h[?2026lthinking...[?2026h[?2026lthinking...[?2026h[?2026l └──────────────────────────────────────────────────────────────────┘
+
+   [10:35 AM]
+   Which model you are? ⎘
+ ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ Product Analytics for engineers[101X Ad [Report 1] │
+ │ No credit card needed, no quick calls, no dental records. LFG.[85X│
+ │  Get HogPilled  posthog.com[120X│
+ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ 
+│ quick question 1/11  □□□□□□□□□□□[115X│ 
+│ Who pays for your dev tools?[119X│ 
+│ 1 Me   2 My employer   3 Both   4 Nobody, I stick to free tools   0 Doesn't apply[66X│ 
+│ 1–4 pick · 0 doesn't apply · esc not now (3 days)[98X│ 
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯ [?2026h[?2026lthinking...[?2026h[?2026l1s[?2026h[?2026lthinking...[?2026h[?2026lthinking...[?2026h[?2026lthinking...[?2026h[?2026lthinking...[?2026h[?2026lthinking...[?2026h[?2026lthinking..[?2026h[?2026lworking...[130X2[?2026h[?2026l  [10:35 AM][71X  Which model you are? ⎘[59X • Thinking[72X   The user is asking directly what model I'm running on. Per my configuration, I'm[?2026h[?2026lworking...[?2026h[?2026l powered by GLM 5.3 Flash, a model trained by Z.ai[?2026h[?2026lworking...[?2026h[?2026lWhich model you are? ⎘[117X[139X
+ Thinking[130X The user is asking directly what model I'm running on. Per my configuration, I'm powered by GLM 5.3 Flash, a model trained by Z.ai, and I [?2026h[?2026lworking...[?2026h[?2026l[141X
+ • Thinking[130X   The user is asking directly what model I'm running on. Per my configuration, I'm powered by GLM 5.3 Flash, a model trained by Z.ai, and I    operate as Buffy, the coding agent within the Freebuff environment. This is a straightforward informational question — no tools, file     [?2026h[?2026lworking...[?2026h[?2026lworking...[?2026h[?2026l• Thinking[133X  The user is asking directly what model I'm running on. Per my configuration, I'm powered by GLM 5.3 Flash, a model trained by Z.ai, and I      operate as Buffy, the coding agent within the Freebuff environment. This is a straightforward informational question — no tools, file          exploration, or code changes are needed. I'll answer clearly and briefly, distinguishing between the agent identity (Buffy/Freebuff) and the [?2026h[?2026lworking...[130X3[?2026h[?2026lworking...[?2026h[?2026l  operate as Buffy, the coding agent within the Freebuff environment. This is a straightforward informational question — no tools, file          exploration, or code changes are needed. I'll answer clearly and briefly, distinguishing between the agent identity (Buffy/Freebuff) and the I'mnBuffy,ntheocodingLM 5.3 Flash), and offer to help with a coding task.[70X[143X[?2026h[?2026lworking...[?2026h[?2026lagent behind,Freebuff,rand I'mppowered byd**GLMa5.3[?2026h[?2026lworking...[?2026h[?2026lexploration, or code changes are needed. I'll answer clearly and briefly, distinguishing between the agent identity (Buffy/Freebuff) and the underlying model (GLM 5.3 Flash), and offer to help with a coding task.[70Xm Buffy, the coding agent behind Freebuff, and I'm powered by GLM 5.3 Flash, a large language model trained by Z.ai.[25X[?2026h[?2026l  • Thinking 
+    The user is asking directly what model I'm running on. Per my configuration, I'm powered by GLM 5.3 Flash, a model trained by Z.ai, and I  
+    operate as Buffy, the coding agent within the Freebuff environment. This is a straightforward informational question — no tools, file  
+    exploration, or code changes are needed. I'll answer clearly and briefly, distinguishing between the agent identity (Buffy/Freebuff) and the        
+    underlying model (GLM 5.3 Flash), and offer to help with a coding task. 
+ 
+  I'm Buffy, the coding agent behind Freebuff, and I'm powered by GLM 5.3 Flash, a large language model trained by Z.ai.█
+█
+  Is there something I can help you with in your project?█
+[137X⎘ • 3s • △▽   █
+ ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ 
+ │ Product Analytics for engineers[101X Ad [Report 1] │ 
+ │ No credit card needed, no quick calls, no dental records. LFG.[85X│ 
+ │  Get HogPilled  posthog.com[120X│ 
+ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯ 
+ 1h left · 13.2K (1%)[116X✕ End session  
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+││
+│  ▍Enter a coding task or / for commands│[?2026h[?2026l 
