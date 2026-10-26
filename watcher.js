@@ -1,33 +1,40 @@
 const chokidar = require('chokidar');
 const fs = require('fs');
+const path = require('path');
 const notifier = require('node-notifier');
 
-const logFilePath = 'C:\\Global-AI-Notifier\\logs\\full_terminal.log';
+const logDir = 'C:\\Global-AI-Notifier\\logs';
+const freebuffLog = path.join(logDir, 'freebuff_logger.log');
+const agyLog = path.join(logDir, 'agy_logger.log');
 
-console.log(`[Watcher Engine Started] Monitoring terminal logs: ${logFilePath}`);
+console.log(`[Watcher Engine Started] Monitoring both Freebuff and Agy logs...`);
 
-let lastFileSize = 0;
-let idleTimer = null;
-let isProcessing = false;        // Tracks if AI is currently thinking/working
-let notificationTriggered = false; // Prevents repeated notifications on idle
+// Independent state tracking for each tool
+const states = {
+    [freebuffLog]: { lastSize: 0, idleTimer: null, isProcessing: false, notificationTriggered: false, name: 'Freebuff' },
+    [agyLog]: { lastSize: 0, idleTimer: null, isProcessing: false, notificationTriggered: false, name: 'Agy' }
+};
 
-if (fs.existsSync(logFilePath)) {
-    lastFileSize = fs.statSync(logFilePath).size;
-}
+// Initialize file sizes
+[freebuffLog, agyLog].forEach(file => {
+    if (fs.existsSync(file)) {
+        states[file].lastSize = fs.statSync(file).size;
+    }
+});
 
-function triggerSuccessNotification(reason) {
-    if (notificationTriggered) return;
+function triggerSuccessNotification(state, reason) {
+    if (state.notificationTriggered) return;
 
-    notificationTriggered = true;
-    isProcessing = false;
-    clearTimeout(idleTimer);
+    state.notificationTriggered = true;
+    state.isProcessing = false;
+    clearTimeout(state.idleTimer);
 
     // Terminal beep sound
     process.stdout.write('\x07');
 
     notifier.notify(
         {
-            title: 'Freebuff Task Completed',
+            title: `${state.name} Task Completed`,
             message: `Execution finished (${reason})`,
             sound: true,
             wait: false,
@@ -35,33 +42,37 @@ function triggerSuccessNotification(reason) {
         },
         (err) => {
             if (!err) {
-                console.log(`\n[Notification Sent] Triggered by: ${reason}`);
+                console.log(`\n[Notification Sent] ${state.name} - Triggered by: ${reason}`);
             }
         }
     );
 }
 
-chokidar.watch(logFilePath, {
+// Watch both log files concurrently
+chokidar.watch([freebuffLog, agyLog], {
     persistent: true,
     usePolling: true,
     interval: 300
 }).on('change', (filePath) => {
+    const state = states[filePath];
+    if (!state) return;
+
     fs.stat(filePath, (err, stats) => {
         if (err) return;
 
-        // Reset state if log is cleared for a new session
-        if (stats.size < lastFileSize) {
-            lastFileSize = 0;
-            isProcessing = false;
-            notificationTriggered = false;
-            clearTimeout(idleTimer);
-            console.log('\n[Watcher] New session detected. Resetting state.');
+        // Reset state if log was cleared for a new session
+        if (stats.size < state.lastSize) {
+            state.lastSize = 0;
+            state.isProcessing = false;
+            state.notificationTriggered = false;
+            clearTimeout(state.idleTimer);
+            console.log(`\n[Watcher] New ${state.name} session detected. Resetting state.`);
         }
 
-        if (stats.size === lastFileSize) return;
+        if (stats.size === state.lastSize) return;
 
         const stream = fs.createReadStream(filePath, {
-            start: lastFileSize,
+            start: state.lastSize,
             end: stats.size,
             encoding: 'utf8'
         });
@@ -72,37 +83,40 @@ chokidar.watch(logFilePath, {
         });
 
         stream.on('end', () => {
-            lastFileSize = stats.size;
+            state.lastSize = stats.size;
             if (!newContent.trim()) return;
 
             const cleanContent = newContent.replace(/\x1B\[[0-9;]*[a-zA-K]/g, '').toLowerCase();
 
-            // Detect active processing state
+            // Detect active processing state (Only trigger if not already processing)
             if (
                 cleanContent.includes('thinking') || 
                 cleanContent.includes('working') || 
                 cleanContent.includes('starting your model session')
             ) {
-                isProcessing = true;
-                notificationTriggered = false; // Reset lock for the current task
-                clearTimeout(idleTimer);
+                if (!state.isProcessing && !state.notificationTriggered) {
+                    state.isProcessing = true;
+                    console.log(`\n[${state.name}] AI started processing...`);
+                }
+                clearTimeout(state.idleTimer);
             }
 
-            // Only evaluate end triggers if the model was actively processing
-            if (isProcessing && !notificationTriggered) {
+            // Only evaluate end triggers if the model was actively processing and notification hasn't been sent yet
+            if (state.isProcessing && !state.notificationTriggered) {
                 // 1. Direct Pattern Match on Task Completion
                 if (
                     cleanContent.includes('✕ end session') || 
+                    cleanContent.includes('end session') ||
                     cleanContent.includes('enter a coding task') ||
                     cleanContent.includes('add to the current task')
                 ) {
-                    triggerSuccessNotification('Pattern Matched');
+                    triggerSuccessNotification(state, 'Pattern Matched');
                 } else {
-                    // 2. Idle Backup: Trigger if output stops for 3 seconds after active response
-                    clearTimeout(idleTimer);
-                    idleTimer = setTimeout(() => {
-                        if (isProcessing && !notificationTriggered) {
-                            triggerSuccessNotification('Terminal Idle After Work');
+                    // 2. Idle Backup: Trigger if output stops for 4 seconds after active response
+                    clearTimeout(state.idleTimer);
+                    state.idleTimer = setTimeout(() => {
+                        if (state.isProcessing && !state.notificationTriggered) {
+                            triggerSuccessNotification(state, 'Terminal Idle After Work');
                         }
                     }, 3000);
                 }
@@ -110,7 +124,7 @@ chokidar.watch(logFilePath, {
         });
 
         stream.on('error', (streamErr) => {
-            console.error('[Stream Error]', streamErr.message);
+            console.error(`[Stream Error - ${state.name}]`, streamErr.message);
         });
     });
 });
