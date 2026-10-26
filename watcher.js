@@ -1,78 +1,73 @@
-// watcher.js
-const fs = require("fs");
-const path = require("path");
-const { exec } = require("child_process");
-const chokidar = require("chokidar");
+const chokidar = require('chokidar');
+const fs = require('fs');
+const { exec } = require('child_process');
 
-// ১. BurntToast দিয়ে Windows Native Toast Banner পাঠানোর ফাংশন
-function sendGlobalToast(title, message) {
-  const cleanTitle = title.replace(/"/g, '`"');
-  const cleanMessage = message.replace(/"/g, '`"');
+const logFilePath = 'C:\\Global-AI-Notifier\\logs\\full_terminal.log';
 
-  // PowerShell Array Syntax ব্যবহার করে সঠিক কমান্ড ট্রিগার করা
-  const command = `powershell -ExecutionPolicy Bypass -Command "New-BurntToastNotification -Text @(\\"${cleanTitle}\\", \\"${cleanMessage}\\")"`;
+console.log(`[Watcher Engine Started] Monitoring: ${logFilePath}`);
 
-  exec(command, (err) => {
-    if (err) {
-      console.error("❌ BurntToast Error:", err);
-    }
-  });
+let lastFileSize = 0;
 
-  console.log(`🔔 [BurntToast Banner Sent]: ${title} - ${message}`);
+if (fs.existsSync(logFilePath)) {
+    lastFileSize = fs.statSync(logFilePath).size;
 }
 
-// ২. লগের ফোল্ডার ও ফাইল প্যাথ
-const watchFolder = "C:\\Global-AI-Notifier\\logs";
-const targetFile = path.join(watchFolder, "terminal.log");
-
-// ফোল্ডার না থাকলে স্বয়ংক্রিয়ভাবে তৈরি করা
-if (!fs.existsSync(watchFolder)) {
-  fs.mkdirSync(watchFolder, { recursive: true });
-}
-
-console.log(`👀 Background watcher is running...`);
-console.log(`📄 Monitoring log file: ${targetFile}`);
-
-// ৩. ফাইল কনটেন্ট পড়া এবং প্রসেস করা
-function processFileContent(filePath) {
-  setTimeout(() => {
-    fs.readFile(filePath, "utf8", (err, data) => {
-      if (err) {
-        console.error("❌ Error reading log file:", err);
-        return;
-      }
-
-      const logText = data.trim();
-      if (!logText) return;
-
-      console.log(`\n📥 Log Content Detected:\n"${logText}"`);
-
-      const textLower = logText.toLowerCase();
-
-      // আরও নমনীয় ও আপডেট করা কিওয়ার্ড ম্যাচিং লজিক
-      if (textLower.includes("success") || textLower.includes("complete") || textLower.includes("finished")) {
-        sendGlobalToast("Task Successful", "Terminal task completed successfully!");
-      } else if (
-        textLower.includes("y/n") ||
-        textLower.includes("?") ||
-        textLower.includes("allow") ||
-        textLower.includes("confirm") ||
-        textLower.includes("proceed")
-      ) {
-        sendGlobalToast("Input Required", "Terminal is waiting for your permission/input.");
-      } else if (textLower.includes("error") || textLower.includes("failed") || textLower.includes("exception")) {
-        sendGlobalToast("Task Error", "An error was logged in terminal output.");
-      }
+function sendNotification(title, message) {
+    const psCommand = `PowerShell -Command "New-BurntToastNotification -Text '${title}', '${message}'"`;
+    
+    exec(psCommand, (error) => {
+        if (error) {
+            console.error(`[Error] Failed to send notification: ${error.message}`);
+        } else {
+            console.log(`[Notification Sent] ${title}: ${message}`);
+        }
     });
-  }, 100);
 }
 
-// ৪. Chokidar File Watcher
-const watcher = chokidar.watch(targetFile, {
-  persistent: true,
-  usePolling: true,
-  interval: 100,
-});
+chokidar.watch(logFilePath, {
+    persistent: true,
+    usePolling: true,
+    interval: 500
+}).on('change', (filePath) => {
+    fs.stat(filePath, (err, stats) => {
+        if (err) return;
 
-watcher.on("add", (filePath) => processFileContent(filePath));
-watcher.on("change", (filePath) => processFileContent(filePath));
+        // If log file was truncated/cleared, reset lastFileSize to 0
+        if (stats.size < lastFileSize) {
+            lastFileSize = 0;
+        }
+
+        if (stats.size === lastFileSize) return;
+
+        const stream = fs.createReadStream(filePath, {
+            start: lastFileSize,
+            end: stats.size,
+            encoding: 'utf8'
+        });
+
+        let newContent = '';
+        stream.on('data', (chunk) => {
+            newContent += chunk;
+        });
+
+        stream.on('end', () => {
+            lastFileSize = stats.size;
+
+            if (!newContent.trim()) return;
+
+            const cleanContent = newContent.replace(/\x1B\[[0-9;]*[a-zA-K]/g, '').toLowerCase();
+
+            // Check if session has ended
+            if (cleanContent.includes('end session') || cleanContent.includes('✕ end session')) {
+                sendNotification('Session Success', 'Freebuff session has ended successfully!');
+            }
+            else if (cleanContent.includes('task completed') || cleanContent.includes('finished')) {
+                sendNotification('AI Task Completed', 'Freebuff has finished the task execution.');
+            }
+        });
+
+        stream.on('error', (streamErr) => {
+            console.error('[Stream Error]', streamErr.message);
+        });
+    });
+});
