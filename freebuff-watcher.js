@@ -99,10 +99,21 @@ chokidar
         if (isProcessing && !notificationTriggered) {
           // 1. Direct Pattern Match on Task Completion
           if (
-            cleanContent.includes("✕ end session") ||
-            cleanContent.includes("enter a coding task") ||
-            cleanContent.includes("add to the current task")
+            cleanContent.includes("some questions for you") ||
+            cleanContent.includes("question for you") ||
+            cleanContent.includes("do you want to") ||
+            cleanContent.includes("would you like to") ||
+            cleanContent.includes("once you confirm") ||
+            cleanContent.includes("please confirm") ||
+            cleanContent.includes("which of these should i") ||
+            cleanContent.includes("do you want me to") ||
+            cleanContent.includes("do you want me to continue")
           ) {
+            triggerSuccessNotification(
+              "❓ Freebuff: Question for You",
+              "AI is waiting for your input or response!",
+            );
+          } else if (cleanContent.includes("✕ end session")) {
             triggerSuccessNotification(
               "✅ Freebuff: Task Finished",
               "Task completed. Enter a new coding task.",
