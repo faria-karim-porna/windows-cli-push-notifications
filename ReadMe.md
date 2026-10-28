@@ -21,157 +21,392 @@ npm install node-notifier chokidar
 Install-Module -Name BurntToast -Force -Scope CurrentUser
 ```
 
-3. Create a file named `watcher.js` inside the folder `Global-AI-Notifier`
+3. Create two files named `agy-watcher.js` and `freebuff-watcher.js` inside the folder `Global-AI-Notifier`
 
-4. `watcher.js` e nicher code ta likho:
+4. `freebuff-watcher.js` e nicher code ta likho:
 
 ```js
-// watcher.js
-const fs = require('fs');
-const path = require('path');
-const { exec } = require('child_process');
-const chokidar = require('chokidar');
+const chokidar = require("chokidar");
+const fs = require("fs");
+const notifier = require("node-notifier");
 
-// ১. BurntToast দিয়ে Windows Native Toast Banner পাঠানোর ফাংশন
-function sendGlobalToast(title, message) {
-  const cleanTitle = title.replace(/"/g, '`"');
-  const cleanMessage = message.replace(/"/g, '`"');
+const logFilePath = "C:\\Global-AI-Notifier\\logs\\freebuff_logger.log";
 
-  // PowerShell Array Syntax ব্যবহার করে সঠিক কমান্ড ট্রিগার করা
-  const command = `powershell -ExecutionPolicy Bypass -Command "New-BurntToastNotification -Text @(\\"${cleanTitle}\\", \\"${cleanMessage}\\")"`;
+console.log(
+  `[Watcher Engine Started] Monitoring terminal logs: ${logFilePath}`,
+);
 
-  exec(command, (err) => {
-    if (err) {
-      console.error('❌ BurntToast Error:', err);
-    }
-  });
+let lastFileSize = 0;
+let idleTimer = null;
+let isProcessing = false; // Tracks if AI is currently thinking/working
+let notificationTriggered = false; // Prevents repeated notifications on idle
 
-  console.log(`🔔 [BurntToast Banner Sent]: ${title} - ${message}`);
+if (fs.existsSync(logFilePath)) {
+  lastFileSize = fs.statSync(logFilePath).size;
 }
 
-// ২. লগের ফোল্ডার ও ফাইল প্যাথ
-const watchFolder = 'C:\\Global-AI-Notifier\\logs';
-const targetFile = path.join(watchFolder, 'terminal.log');
+function triggerSuccessNotification(title, message) {
+  if (notificationTriggered) return;
 
-// ফোল্ডার না থাকলে স্বয়ংক্রিয়ভাবে তৈরি করা
-if (!fs.existsSync(watchFolder)) {
-  fs.mkdirSync(watchFolder, { recursive: true });
+  notificationTriggered = true;
+  isProcessing = false;
+  clearTimeout(idleTimer);
+
+  // Terminal beep sound
+  process.stdout.write("\x07");
+
+  notifier.notify(
+    {
+      title: title,
+      message: message,
+      sound: true,
+      wait: false,
+      icon: "C:\\Global-AI-Notifier\\freebuff-logo.png",
+      appID: "Global AI Notifier",
+    },
+    (err) => {
+      if (!err) {
+        console.log(`\n[Notification Sent] Triggered by: ${title}`);
+      }
+    },
+  );
 }
 
-console.log(`👀 Background watcher is running...`);
-console.log(`📄 Monitoring log file: ${targetFile}`);
+chokidar
+  .watch(logFilePath, {
+    persistent: true,
+    usePolling: true,
+    interval: 300,
+  })
+  .on("change", (filePath) => {
+    fs.stat(filePath, (err, stats) => {
+      if (err) return;
 
-// ৩. ফাইল কনটেন্ট পড়া এবং প্রসেস করা
-function processFileContent(filePath) {
-  setTimeout(() => {
-    fs.readFile(filePath, 'utf8', (err, data) => {
-      if (err) {
-        console.error('❌ Error reading log file:', err);
-        return;
+      // Reset state if log is cleared for a new session
+      if (stats.size < lastFileSize) {
+        lastFileSize = 0;
+        isProcessing = false;
+        notificationTriggered = false;
+        clearTimeout(idleTimer);
+        console.log("\n[Watcher] New session detected. Resetting state.");
       }
 
-      const logText = data.trim();
-      if (!logText) return;
+      if (stats.size === lastFileSize) return;
 
-      console.log(`\n📥 Log Content Detected:\n"${logText}"`);
+      const stream = fs.createReadStream(filePath, {
+        start: lastFileSize,
+        end: stats.size,
+        encoding: "utf8",
+      });
 
-      const textLower = logText.toLowerCase();
+      let newContent = "";
+      stream.on("data", (chunk) => {
+        newContent += chunk;
+      });
 
-      // আরও নমনীয় ও আপডেট করা কিওয়ার্ড ম্যাচিং লজিক
-      if (textLower.includes('success') || textLower.includes('complete') || textLower.includes('finished')) {
-        sendGlobalToast('Task Successful', 'Terminal task completed successfully!');
-      } 
-      else if (textLower.includes('y/n') || textLower.includes('?') || textLower.includes('allow') || textLower.includes('confirm') || textLower.includes('proceed')) {
-        sendGlobalToast('Input Required', 'Terminal is waiting for your permission/input.');
-      } 
-      else if (textLower.includes('error') || textLower.includes('failed') || textLower.includes('exception')) {
-        sendGlobalToast('Task Error', 'An error was logged in terminal output.');
-      }
+      stream.on("end", () => {
+        lastFileSize = stats.size;
+        if (!newContent.trim()) return;
+
+        const cleanContent = newContent
+          .replace(/\x1B\[[0-9;]*[a-zA-K]/g, "")
+          .toLowerCase();
+
+        // Detect active processing state
+        if (
+          cleanContent.includes("thinking") ||
+          cleanContent.includes("working") ||
+          cleanContent.includes("starting your model session")
+        ) {
+          isProcessing = true;
+          notificationTriggered = false; // Reset lock for the current task
+          clearTimeout(idleTimer);
+        }
+
+        // Only evaluate end triggers if the model was actively processing
+        if (isProcessing && !notificationTriggered) {
+          // 1. Direct Pattern Match on Task Completion
+          if (
+            cleanContent.includes("some questions for you") ||
+            cleanContent.includes("question for you") ||
+            cleanContent.includes("do you want to") ||
+            cleanContent.includes("would you like to") ||
+            cleanContent.includes("once you confirm") ||
+            cleanContent.includes("please confirm") ||
+            cleanContent.includes("which of these should i") ||
+            cleanContent.includes("do you want me to") ||
+            cleanContent.includes("do you want me to continue")
+          ) {
+            triggerSuccessNotification(
+              "❓ Freebuff: Question for You",
+              "AI is waiting for your input or response!",
+            );
+          } else if (cleanContent.includes("✕ end session")) {
+            triggerSuccessNotification(
+              "✅ Freebuff: Task Finished",
+              "Task completed. Enter a new coding task.",
+            );
+          } else {
+            // 2. Idle Backup: Trigger if output stops for 3 seconds after active response
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+              if (isProcessing && !notificationTriggered) {
+                triggerSuccessNotification(
+                  "Terminal Idle After Work",
+                  "No activity detected for 3 seconds.",
+                );
+              }
+            }, 3000);
+          }
+        }
+      });
+
+      stream.on("error", (streamErr) => {
+        console.error("[Stream Error]", streamErr.message);
+      });
     });
-  }, 100);
-}
-
-// ৪. Chokidar File Watcher
-const watcher = chokidar.watch(targetFile, { 
-  persistent: true,
-  usePolling: true,
-  interval: 100
-});
-
-watcher.on('add', (filePath) => processFileContent(filePath));
-watcher.on('change', (filePath) => processFileContent(filePath));
+  });
 ```
 
-5. new file `capture.js` create korun
-6. `capture.js` e nicher code ta likhun
+5. `agy-watcher.js` e nicher code ta likho:
 
 ```js
-const pty = require('node-pty');
-const fs = require('fs');
-const path = require('path');
+const chokidar = require("chokidar");
+const fs = require("fs");
+const notifier = require("node-notifier");
+
+const logFilePath = "C:\\Global-AI-Notifier\\logs\\agy_logger.log";
+
+console.log(
+  `[Watcher Engine Started] Monitoring terminal logs: ${logFilePath}`,
+);
+
+let lastFileSize = 0;
+let idleTimer = null;
+let isProcessing = false; // Tracks if AI is currently thinking/working
+let notificationTriggered = false; // Prevents repeated notifications on idle
+
+if (fs.existsSync(logFilePath)) {
+  lastFileSize = fs.statSync(logFilePath).size;
+}
+
+function triggerSuccessNotification(title, message) {
+  if (notificationTriggered) return;
+
+  notificationTriggered = true;
+  isProcessing = false;
+  clearTimeout(idleTimer);
+
+  // Terminal beep sound
+  process.stdout.write("\x07");
+
+  notifier.notify(
+    {
+      title: title,
+      message: message,
+      sound: true,
+      wait: false,
+      icon: "C:\\Global-AI-Notifier\\agy-logo.png",
+      appID: "Global AI Notifier",
+    },
+    (err) => {
+      if (!err) {
+        console.log(`\n[Notification Sent] Triggered by: ${title}`);
+      }
+    },
+  );
+}
+
+chokidar
+  .watch(logFilePath, {
+    persistent: true,
+    usePolling: true,
+    interval: 300,
+  })
+  .on("change", (filePath) => {
+    fs.stat(filePath, (err, stats) => {
+      if (err) return;
+
+      // Reset state if log is cleared for a new session
+      if (stats.size < lastFileSize) {
+        lastFileSize = 0;
+        isProcessing = false;
+        notificationTriggered = false;
+        clearTimeout(idleTimer);
+        console.log("\n[Watcher] New session detected. Resetting state.");
+      }
+
+      if (stats.size === lastFileSize) return;
+
+      const stream = fs.createReadStream(filePath, {
+        start: lastFileSize,
+        end: stats.size,
+        encoding: "utf8",
+      });
+
+      let newContent = "";
+      stream.on("data", (chunk) => {
+        newContent += chunk;
+      });
+
+      stream.on("end", () => {
+        lastFileSize = stats.size;
+        if (!newContent.trim()) return;
+
+        const cleanContent = newContent
+          .replace(/\x1B\[[0-9;]*[a-zA-K]/g, "")
+          .toLowerCase();
+
+        // Detect active processing state
+        if (
+          cleanContent.includes("generating...") ||
+          cleanContent.includes("running command...") ||
+          cleanContent.includes("reading files...") ||
+          cleanContent.includes("working...") ||
+          cleanContent.includes("editing files...") ||
+          cleanContent.includes("reading file...") ||
+          cleanContent.includes("editing file...")
+        ) {
+          isProcessing = true;
+          notificationTriggered = false; // Reset lock for the current task
+          clearTimeout(idleTimer);
+        }
+
+        // Only evaluate end triggers if the model was actively processing
+        if (isProcessing && !notificationTriggered) {
+          // 1. Direct Pattern Match on Task Completion
+          if (
+            cleanContent.includes("run this command?") ||
+            cleanContent.includes("allow creation of this file?") ||
+            cleanContent.includes("accept this file edit?")
+          ) {
+            triggerSuccessNotification(
+              "⚠️ Agy: Permission Required",
+              "Action blocked due to permission or access restriction.",
+            );
+          } else if (cleanContent.includes("question 1/")) {
+            triggerSuccessNotification(
+              "❓ Agy: Question for You",
+              "AI is waiting for your input or response!",
+            );
+          } else if (cleanContent.includes("? for shortcuts")) {
+            triggerSuccessNotification(
+              "✅ Agy: Task Finished",
+              "Task completed. Enter a new coding task.",
+            );
+          } else {
+            // 2. Idle Backup: Trigger if output stops for 3 seconds after active response
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+              if (isProcessing && !notificationTriggered) {
+                triggerSuccessNotification(
+                  "Terminal Idle After Work",
+                  "No activity detected for 3 seconds.",
+                );
+              }
+            }, 3000);
+          }
+        }
+      });
+
+      stream.on("error", (streamErr) => {
+        console.error("[Stream Error]", streamErr.message);
+      });
+    });
+  });
+```
+
+7. `capture.js` e nicher code ta likhun git bash er jonno
+
+```js
+const pty = require("node-pty");
+const fs = require("fs");
+const path = require("path");
 
 const command = process.argv[2];
 const args = process.argv.slice(3);
-const logDir = 'C:\\Global-AI-Notifier\\logs';
-const logFile = path.join(logDir, 'full_terminal.log');
+const logDir = "C:\\Global-AI-Notifier\\logs";
 
 if (!command) {
-    console.error('No command specified.');
-    process.exit(1);
+  console.error("No command specified.");
+  process.exit(1);
 }
 
 if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
+  fs.mkdirSync(logDir, { recursive: true });
 }
 
-// Spawn pseudo terminal using cmd.exe to correctly resolve global CLI tools (like freebuff or agy)
-const ptyProcess = pty.spawn('cmd.exe', ['/c', command, ...args], {
-    name: 'xterm-color',
+// Select dedicated log file based on command name
+let specificLogName = "terminal_fallback.log";
+if (command.toLowerCase().includes("freebuff")) {
+  specificLogName = "freebuff_logger.log";
+} else if (command.toLowerCase().includes("agy")) {
+  specificLogName = "agy_logger.log";
+}
+
+const logFile = path.join(logDir, specificLogName);
+
+// FRESH START: Clear specific log immediately on new session start
+try {
+  fs.writeFileSync(logFile, "", "utf8");
+} catch (e) {}
+
+// Git Bash er path (jodi standard path-e Git thake) ebong bash.exe spawn kora
+const bashPath = "C:\\Program Files\\Git\\bin\\bash.exe";
+const shellToUse = fs.existsSync(bashPath) ? bashPath : "cmd.exe";
+
+// Spawn pseudo terminal (Git Bash / Bash or fallback to cmd.exe)
+const ptyProcess = pty.spawn(
+  shellToUse,
+  shellToUse.includes("bash.exe")
+    ? ["-c", `${command} ${args.join(" ")}`]
+    : ["/c", command, ...args],
+  {
+    name: "xterm-color",
     cols: process.stdout.columns || 80,
     rows: process.stdout.rows || 30,
     cwd: process.cwd(),
-    env: process.env
-});
+    env: process.env,
+  },
+);
 
-// Write terminal output to full_terminal.log and render to screen safely
+// LIVE LOGGING: Write output to the specific log file and render to screen
 ptyProcess.onData((data) => {
-    // Strip ANSI escape codes to keep log text clean and readable
-    const cleanText = data.replace(/\x1B\[[0-9;]*[a-zA-K]/g, '');
-    try {
-        fs.appendFileSync(logFile, cleanText, 'utf8');
-    } catch (e) {
-        // Silently handle file write locks
-    }
-    process.stdout.write(data);
+  const cleanText = data.replace(/\x1B\[[0-9;]*[a-zA-K]/g, "");
+  try {
+    fs.appendFileSync(logFile, cleanText, "utf8");
+  } catch (e) {}
+  process.stdout.write(data);
 });
 
-// Handle user keyboard inputs
+// USER INPUT HANDLING
 if (process.stdin.isTTY) {
-    process.stdin.setRawMode(true);
+  process.stdin.setRawMode(true);
 }
 
-process.stdin.on('data', (key) => {
-    // Graceful exit on Ctrl+C
-    if (key.toString() === '\u0003') {
-        ptyProcess.kill();
-        process.exit();
-    }
-    try {
-        ptyProcess.write(key);
-    } catch (e) {}
+process.stdin.on("data", (key) => {
+  if (key.toString() === "\u0003") {
+    // Ctrl+C
+    ptyProcess.kill();
+    process.exit();
+  }
+  try {
+    ptyProcess.write(key);
+  } catch (e) {}
 });
 
 ptyProcess.onExit(({ exitCode }) => {
-    process.exit(exitCode);
+  process.exit(exitCode);
 });
 ```
 
-7. Write the following command in any terminal to run it in background from any project
+8. Write the following command in any terminal to run it in background from any project
 
 ```cmd
 npm install -g pm2 pm2-windows-startup
 pm2-startup install
-pm2 start "C:\Global-AI-Notifier\watcher.js" --name "ai-terminal-notifier"
+pm2 start "C:\Global-AI-Notifier\freebuff-watcher.js" --name "freebuff-watcher"
+pm2 start "C:\Global-AI-Notifier\agy-watcher.js" --name "agy-watcher"
 pm2 save
 ```
 
@@ -245,8 +480,56 @@ function freebuff {
 ``` 
   10. প্রোফাইলটি ম্যানুয়ালি লোড করে টেস্ট করুন: `. $PROFILE`
 
-11. If you do any changes in the watcher.js, restart the background system by writing down the following command in the terminal
+11. VS code er git bash theke kaaj korar jonno Git bash k default terminal e set korte hobe
+
+12. Erpor vs code er git bash terminal theke nicher command likho
 
 ```cmd
-pm2 restart ai-terminal-notifier
+nano ~/.bashrc
+```
+
+12. Oi terminal er agey nicher 2ta line add koro r add kore obosshoi space diyo
+
+```cmd
+alias freebuff='node "C:/Global-AI-Notifier/capture.js" freebuff'
+alias agy='node "C:/Global-AI-Notifier/capture.js" agy'
+```
+
+![alt text](image-2.png)
+
+13. Eta save korar jonno `ctrl + s` and exit korar jonno `ctrl+ x` press koro
+14. Erpor vs code er git bash terminal e nicher command ta likho:
+
+```cmd
+source ~/.bashrc
+```
+
+15. If you do any changes in the agy-watcher.js, restart the background system by writing down the following command in the terminal
+
+```cmd
+pm2 restart agy-watcher
+```
+
+16. If you do any changes in the freebuff-watcher.js, restart the background system by writing down the following command in the terminal
+
+```cmd
+pm2 restart freebuff-watcher
+```
+
+17. powershell er version check korar jonno nicher command ta likhun powershell e:
+
+```cmd
+$PSVersionTable.PSVersion
+```
+
+18. pm2 er list check korar jonno nicher command ta likhun
+
+```cmd
+pm2 list
+```
+
+1.  pm2 theke delete korar jonno nicher command ta likhun
+
+```cmd
+pm2 delete ai-notifier
 ```
