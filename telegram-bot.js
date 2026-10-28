@@ -22,7 +22,11 @@ import {
   registerCurrentCliCommand,
   handleCurrentCliFlow,
 } from "./commands/currentCli.js";
-import { registerEndCliCommand, handleEndCliFlow } from "./commands/endCli.js"; // নতুন ইম্পোর্ট
+import { registerEndCliCommand, handleEndCliFlow } from "./commands/endCli.js";
+import {
+  registerCloseCodeCommand,
+  handleCloseCodeFlow,
+} from "./commands/closeCode.js"; // নতুন ইম্পোর্ট
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
@@ -51,7 +55,8 @@ registerSearchFileCommand(bot, userStates);
 registerUpdatePromptCommand(bot, userStates);
 registerRunCliCommand(bot, userStates);
 registerCurrentCliCommand(bot, userStates);
-registerEndCliCommand(bot, userStates); // নতুন রেজিস্টার
+registerEndCliCommand(bot, userStates);
+registerCloseCodeCommand(bot, userStates); // নতুন রেজিস্টার
 
 // সেন্ট্রাল মেসেজ লিসেনার
 bot.on("message", async (ctx) => {
@@ -77,7 +82,9 @@ bot.on("message", async (ctx) => {
   } else if (state.command === "CURRENT_CLI") {
     await handleCurrentCliFlow(ctx, chatId, text, userStates);
   } else if (state.command === "END_CLI") {
-    await handleEndCliFlow(ctx, chatId, text, state, userStates); // নতুন ফ্লো হ্যান্ডলার
+    await handleEndCliFlow(ctx, chatId, text, state, userStates);
+  } else if (state.command === "CLOSE_CODE") {
+    await handleCloseCodeFlow(ctx, chatId, text, userStates); // নতুন ফ্লো হ্যান্ডলার
   }
 });
 
