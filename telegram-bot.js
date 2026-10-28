@@ -10,26 +10,53 @@ const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
 const bot = new Bot(TOKEN);
 const userStates = new Map();
 
-// গ্লোবালি ফোল্ডার সার্চ করার ফাংশন (ডিফল্ট রুট C:\)
-function searchFolders(dir, keyword, results = [], maxResults = 15) {
+// প্রতিটা লুপে কনসোল লগ সহ গ্লোবাল ফোল্ডার সার্চ ফাংশন
+function searchFoldersInDir(dir, keyword, results = [], maxResults = 15) {
   if (results.length >= maxResults) return;
+
   try {
     const items = fs.readdirSync(dir, { withFileTypes: true });
     for (const item of items) {
       if (results.length >= maxResults) break;
+
       if (item.isDirectory()) {
         const folderName = item.name;
         const fullPath = path.join(dir, folderName);
+
+        // লুপের প্রতিটি ফোল্ডার চেক করার সময় কনসোল লগ প্রিন্ট হবে
+        console.log(`[LOOP SCAN] Checking folder: ${fullPath}`);
+
         if (folderName.toLowerCase().includes(keyword.toLowerCase())) {
+          console.log(`[MATCH FOUND] 🎉 ${fullPath}`);
           results.push(fullPath);
         }
+
         try {
-          searchFolders(fullPath, keyword, results, maxResults);
-        } catch (subErr) {}
+          searchFoldersInDir(fullPath, keyword, results, maxResults);
+        } catch (subErr) {
+          // পার্মিশন বা এক্সেস এরর সাইলেন্টলি স্কিপ করবে
+        }
       }
     }
-  } catch (err) {}
-  return results;
+  } catch (err) {
+    // রুট বা মেইন ডিরেক্টরি এক্সেস এরর ইগনোর করা হবে
+  }
+}
+
+// "This PC" এর সব এভেইলেবল ড্রাইভ (C:\, D:\ ইত্যাদি) খুঁজে বের করার ফাংশন
+function getAllAvailableDrives() {
+  const drives = [];
+  const possibleLetters = ["C", "D", "E", "F", "G", "H", "I", "J"];
+
+  for (const letter of possibleLetters) {
+    const drivePath = `${letter}:\\`;
+    try {
+      if (fs.existsSync(drivePath)) {
+        drives.push(drivePath);
+      }
+    } catch (e) {}
+  }
+  return drives;
 }
 
 async function sendStartupMessage() {
@@ -46,7 +73,7 @@ async function sendStartupMessage() {
   }
 }
 
-// /addprompt কমান্ড (আগের মতোই থাকবে)
+// /addprompt কমান্ড
 bot.command("addprompt", async (ctx) => {
   const chatId = ctx.chat.id;
   console.log(`[CMD] /addprompt triggered by ${chatId}`);
@@ -58,14 +85,14 @@ bot.command("addprompt", async (ctx) => {
   );
 });
 
-// /searchfolder কমান্ড (এখন আর আলাদা করে ডিরেক্টরি চাইবে না, ডিরেক্ট কিউয়ার্ড নিবে)
+// /searchfolder কমান্ড
 bot.command("searchfolder", async (ctx) => {
   const chatId = ctx.chat.id;
   console.log(`[CMD] /searchfolder triggered by ${chatId}`);
   userStates.set(chatId, { command: "SEARCH_FOLDER" });
 
   await ctx.reply(
-    "🔍 Please provide the folder keyword to search globally (e.g., `portfolio` or `Notifier`):",
+    "🔍 Please provide the folder keyword to search globally across 'This PC':",
     { parse_mode: "Markdown" },
   );
 });
@@ -76,7 +103,6 @@ bot.on("message", async (ctx) => {
   const text = ctx.msg?.text || ctx.update?.message?.text;
 
   if (!chatId || !text) return;
-
   if (text.startsWith("/")) return;
 
   const state = userStates.get(chatId);
@@ -127,34 +153,50 @@ bot.on("message", async (ctx) => {
     }
   }
 
-  // 2. SEARCH FOLDER FLOW (গ্লোবাল সার্চ - সরাসরি C:\ ড্রাইভ থেকে)
+  // 2. SEARCH FOLDER FLOW (This PC গ্লোবাল সার্চ + টাইপিং অ্যানিমেশন)
   else if (state.command === "SEARCH_FOLDER") {
     const keyword = text.trim();
-    userStates.delete(chatId); // কাজ শেষ, স্টেট ক্লিয়ার করে দিলাম
+    userStates.delete(chatId);
 
-    const baseDir = "C:\\"; // গ্লোবাল সার্চ রুট ড্রাইভ
     console.log(
-      `[GLOBAL_SEARCH] Searching for keyword "${keyword}" across ${baseDir}...`,
+      `[THIS_PC_SEARCH] Starting global search for keyword: "${keyword}" across all drives...`,
     );
 
     try {
+      // টেলিগ্রামে টাইপিং অ্যানিমেশন দেখানোর জন্য sendChatAction ব্যবহার করা হলো
+      await bot.api.sendChatAction({
+        chat_id: chatId,
+        action: "typing",
+      });
+
       await ctx.reply(
-        `🔍 Globally searching for folders matching "*${keyword}*" across \`${baseDir}\`... Please wait.`,
+        `🔍 Searching globally across 'This PC' for folders matching "*${keyword}*"... Please wait.`,
         { parse_mode: "Markdown" },
       );
 
-      const matchedFolders = searchFolders(baseDir, keyword);
+      const drives = getAllAvailableDrives();
+      console.log(`[DRIVES DETECTED]:`, drives);
+
+      let matchedFolders = [];
+      const maxLimit = 15;
+
+      for (const drive of drives) {
+        if (matchedFolders.length >= maxLimit) break;
+        console.log(`[SCANNING DRIVE]: ${drive}`);
+        searchFoldersInDir(drive, keyword, matchedFolders, maxLimit);
+      }
+
       console.log(
-        `[GLOBAL_SEARCH] Found folders count: ${matchedFolders.length}`,
+        `[THIS_PC_SEARCH] Search completed. Total matched: ${matchedFolders.length}`,
       );
 
       if (matchedFolders.length === 0) {
         await ctx.reply(
-          `⚠️ No matching folders found globally for "*${keyword}*".`,
+          `⚠️ No matching folders found globally on 'This PC' for "*${keyword}*".`,
           { parse_mode: "Markdown" },
         );
       } else {
-        let responseText = `📂 *Global Search Results (${matchedFolders.length}):*\n\n`;
+        let responseText = `📂 *This PC Search Results (${matchedFolders.length}):*\n\n`;
         matchedFolders.forEach((folder, index) => {
           responseText += `${index + 1}. \`${folder}\`\n`;
         });
