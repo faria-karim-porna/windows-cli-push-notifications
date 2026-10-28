@@ -17,7 +17,11 @@ import {
   registerUpdatePromptCommand,
   handleUpdatePromptFlow,
 } from "./commands/updatePrompt.js";
-import { registerRunCliCommand, handleRunCliFlow } from "./commands/runCli.js"; // নতুন ইম্পোর্ট
+import { registerRunCliCommand, handleRunCliFlow } from "./commands/runCli.js";
+import {
+  registerCurrentCliCommand,
+  handleCurrentCliFlow,
+} from "./commands/currentCli.js"; // নতুন ইম্পোর্ট
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
@@ -44,7 +48,8 @@ registerAddPromptCommand(bot, userStates);
 registerSearchFolderCommand(bot, userStates);
 registerSearchFileCommand(bot, userStates);
 registerUpdatePromptCommand(bot, userStates);
-registerRunCliCommand(bot, userStates); // নতুন রেজিস্টার
+registerRunCliCommand(bot, userStates);
+registerCurrentCliCommand(bot, userStates); // নতুন রেজিস্টার
 
 // সেন্ট্রাল মেসেজ লিসেনার
 bot.on("message", async (ctx) => {
@@ -66,7 +71,9 @@ bot.on("message", async (ctx) => {
   } else if (state.command === "UPDATE_PROMPT") {
     await handleUpdatePromptFlow(ctx, chatId, text, state, userStates);
   } else if (state.command === "RUN_CLI") {
-    await handleRunCliFlow(ctx, chatId, text, state, userStates, bot); // নতুন ফ্লো হ্যান্ডলার
+    await handleRunCliFlow(ctx, chatId, text, state, userStates, bot);
+  } else if (state.command === "CURRENT_CLI") {
+    await handleCurrentCliFlow(ctx, chatId, text, userStates); // নতুন ফ্লো হ্যান্ডলার
   }
 });
 
