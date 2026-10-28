@@ -39,7 +39,11 @@ import {
 import {
   registerCurrentUsageCommand,
   handleCurrentUsageFlow,
-} from "./commands/currentUsage.js"; // নতুন ইম্পোর্ট
+} from "./commands/currentUsage.js";
+import {
+  registerSwitchUserCommand,
+  handleSwitchUserFlow,
+} from "./commands/switchUser.js"; // নতুন ইম্পোর্ট
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
@@ -74,7 +78,8 @@ registerNavigatePathCommand(bot, userStates);
 registerNavigateCallback(bot);
 registerSwitchModelCommand(bot, userStates);
 registerSwitchModelCallback(bot);
-registerCurrentUsageCommand(bot, userStates); // নতুন রেজিস্টার
+registerCurrentUsageCommand(bot, userStates);
+registerSwitchUserCommand(bot, userStates); // নতুন রেজিস্টার
 
 // সেন্ট্রাল মেসেজ লিসেনার
 bot.on("message", async (ctx) => {
@@ -106,7 +111,9 @@ bot.on("message", async (ctx) => {
   } else if (state.command === "SWITCH_MODEL") {
     await handleSwitchModelFlow(ctx, chatId, text, state, userStates);
   } else if (state.command === "CURRENT_USAGE") {
-    await handleCurrentUsageFlow(ctx, chatId, text, userStates); // নতুন ফ্লো হ্যান্ডলার
+    await handleCurrentUsageFlow(ctx, chatId, text, userStates);
+  } else if (state.command === "SWITCH_USER") {
+    await handleSwitchUserFlow(ctx, chatId, text, state, userStates); // নতুন ফ্লো হ্যান্ডলার
   }
 });
 
