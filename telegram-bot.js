@@ -1,101 +1,164 @@
-import "dotenv/config"; // .env ফাইল লোড করার জন্য
+import "dotenv/config";
 import { Bot } from "node-telegram-bot-api";
 import { run } from "node-telegram-bot-api/node";
 import fs from "fs";
 import path from "path";
 
-// .env ফাইল থেকে ভ্যালুগুলো রিড করা হচ্ছে
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
 
-// নতুন v2 সিনট্যাক্স অনুযায়ী Bot ইনিশিয়ালাইজ করা
 const bot = new Bot(TOKEN);
-
-// ইউজারের কারেন্ট স্টেট ট্র্যাক করার জন্য একটি ম্যাপ (যেমন: কে ডিরেক্টরি দিচ্ছে নাকি প্রম্পট দিচ্ছে)
 const userStates = new Map();
 
-// বট রান হওয়ার সাথে সাথে নোটিফিকেশন পাঠানোর জন্য একটি ফাংশন
+// গ্লোবালি ফোল্ডার সার্চ করার ফাংশন (ডিফল্ট রুট C:\)
+function searchFolders(dir, keyword, results = [], maxResults = 15) {
+  if (results.length >= maxResults) return;
+  try {
+    const items = fs.readdirSync(dir, { withFileTypes: true });
+    for (const item of items) {
+      if (results.length >= maxResults) break;
+      if (item.isDirectory()) {
+        const folderName = item.name;
+        const fullPath = path.join(dir, folderName);
+        if (folderName.toLowerCase().includes(keyword.toLowerCase())) {
+          results.push(fullPath);
+        }
+        try {
+          searchFolders(fullPath, keyword, results, maxResults);
+        } catch (subErr) {}
+      }
+    }
+  } catch (err) {}
+  return results;
+}
+
 async function sendStartupMessage() {
   try {
+    console.log("Sending startup message to owner...");
     await bot.api.sendMessage({
       chat_id: OWNER_CHAT_ID,
       text: "🚀 *Global AI Notifier Bot is online and running successfully!*",
       parse_mode: "Markdown",
     });
-    console.log("Startup message sent to Telegram successfully.");
+    console.log("Startup message sent successfully.");
   } catch (err) {
     console.error("Failed to send startup message:", err.message);
   }
 }
 
-// কমান্ড হ্যান্ডলার: /addprompt লেখার পর স্টেপ-বাই-স্টেপ প্রসেস শুরু হবে
+// /addprompt কমান্ড (আগের মতোই থাকবে)
 bot.command("addprompt", async (ctx) => {
   const chatId = ctx.chat.id;
-
-  // ইউজারের স্টেট সেট করলাম যে সে এখন ডিরেক্টরি পাথ দেবে
-  userStates.set(chatId, { step: "WAITING_FOR_DIR" });
+  console.log(`[CMD] /addprompt triggered by ${chatId}`);
+  userStates.set(chatId, { command: "ADD_PROMPT", step: "WAITING_FOR_DIR" });
 
   await ctx.reply(
-    "📂 *Step 1/2:* Please provide the target directory path (e.g., `C:\\Global-AI-Notifier\\tasks`):",
+    "📂 *Step 1/2:* Please provide the target directory path (e.g., `C:\\Global-AI-Notifier`):",
     { parse_mode: "Markdown" },
   );
 });
 
-// সাধারণ টেক্সট মেসেজ হ্যান্ডেল করার জন্য listener (ধাপগুলো হ্যান্ডেল করবে)
-bot.on("message", async (ctx) => {
+// /searchfolder কমান্ড (এখন আর আলাদা করে ডিরেক্টরি চাইবে না, ডিরেক্ট কিউয়ার্ড নিবে)
+bot.command("searchfolder", async (ctx) => {
   const chatId = ctx.chat.id;
-  const text = ctx.msg.text;
+  console.log(`[CMD] /searchfolder triggered by ${chatId}`);
+  userStates.set(chatId, { command: "SEARCH_FOLDER" });
 
-  // যদি ইউজার কোনো কমান্ড দেয় (যেমন: /start বা /addprompt), তবে টেক্সট লজিক ইগনোর করব
-  if (!text || text.startsWith("/")) return;
+  await ctx.reply(
+    "🔍 Please provide the folder keyword to search globally (e.g., `portfolio` or `Notifier`):",
+    { parse_mode: "Markdown" },
+  );
+});
+
+// সেন্ট্রাল মেসেজ লিসেনার
+bot.on("message", async (ctx) => {
+  const chatId = ctx.chat?.id || ctx.msg?.chat?.id;
+  const text = ctx.msg?.text || ctx.update?.message?.text;
+
+  if (!chatId || !text) return;
+
+  if (text.startsWith("/")) return;
 
   const state = userStates.get(chatId);
-  if (!state) return; // যদি ইউজারের কোনো অ্যাক্টিভ স্টেট না থাকে
+  if (!state) return;
 
-  if (state.step === "WAITING_FOR_DIR") {
-    // ডিরেক্টরি পাথ রিসিভ করা হলো, এখন প্রম্পট চাওয়া হবে
-    state.dirPath = text.trim();
-    state.step = "WAITING_FOR_PROMPT";
-    userStates.set(chatId, state);
+  // 1. ADD PROMPT FLOW
+  if (state.command === "ADD_PROMPT") {
+    if (state.step === "WAITING_FOR_DIR") {
+      state.dirPath = text.trim();
+      state.step = "WAITING_FOR_PROMPT";
+      userStates.set(chatId, state);
 
-    await ctx.reply(
-      "✍️ *Step 2/2:* Great! Now please provide your prompt text:",
-      { parse_mode: "Markdown" },
+      await ctx.reply(
+        "✍️ *Step 2/2:* Great! Now please provide your prompt text:",
+        { parse_mode: "Markdown" },
+      );
+    } else if (state.step === "WAITING_FOR_PROMPT") {
+      const dirPath = state.dirPath;
+      const promptText = text.trim();
+      userStates.delete(chatId);
+
+      try {
+        if (!fs.existsSync(dirPath)) {
+          fs.mkdirSync(dirPath, { recursive: true });
+        }
+        const mdFilePath = path.join(dirPath, "prompts.md");
+        const fileExists = fs.existsSync(mdFilePath);
+        const timestamp = new Date().toLocaleString();
+        const markdownEntry = `- **Time:** ${timestamp}\n  - **Prompt:** ${promptText}\n\n`;
+
+        fs.appendFileSync(mdFilePath, markdownEntry, "utf8");
+
+        if (fileExists) {
+          await ctx.reply(
+            `ℹ️ **Note:** The \`prompts.md\` file already existed!\n\nThe new prompt has been appended:\n\`${mdFilePath}\``,
+            { parse_mode: "Markdown" },
+          );
+        } else {
+          await ctx.reply(
+            `✅ **Success!**\n\nA new \`prompts.md\` file has been created:\n\`${mdFilePath}\``,
+            { parse_mode: "Markdown" },
+          );
+        }
+      } catch (error) {
+        console.error(error);
+        await ctx.reply(`❌ Error: ${error.message}`);
+      }
+    }
+  }
+
+  // 2. SEARCH FOLDER FLOW (গ্লোবাল সার্চ - সরাসরি C:\ ড্রাইভ থেকে)
+  else if (state.command === "SEARCH_FOLDER") {
+    const keyword = text.trim();
+    userStates.delete(chatId); // কাজ শেষ, স্টেট ক্লিয়ার করে দিলাম
+
+    const baseDir = "C:\\"; // গ্লোবাল সার্চ রুট ড্রাইভ
+    console.log(
+      `[GLOBAL_SEARCH] Searching for keyword "${keyword}" across ${baseDir}...`,
     );
-  } else if (state.step === "WAITING_FOR_PROMPT") {
-    // প্রম্পট টেক্সট রিসিভ করা হলো, এবার ফাইল প্রসেসিং শুরু হবে
-    const dirPath = state.dirPath;
-    const promptText = text.trim();
-
-    // কাজ শেষের পর ইউজারের স্টেট ক্লিয়ার করে দিলাম
-    userStates.delete(chatId);
 
     try {
-      // ১. ডিরেক্টরি না থাকলে তৈরি করা
-      if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-      }
+      await ctx.reply(
+        `🔍 Globally searching for folders matching "*${keyword}*" across \`${baseDir}\`... Please wait.`,
+        { parse_mode: "Markdown" },
+      );
 
-      const mdFilePath = path.join(dirPath, "prompts.md");
-      const fileExists = fs.existsSync(mdFilePath);
+      const matchedFolders = searchFolders(baseDir, keyword);
+      console.log(
+        `[GLOBAL_SEARCH] Found folders count: ${matchedFolders.length}`,
+      );
 
-      const timestamp = new Date().toLocaleString();
-      const markdownEntry = `- **Time:** ${timestamp}\n  - **Prompt:** ${promptText}\n\n`;
-
-      // ফাইলে প্রম্পট অ্যাপেন্ড করা
-      fs.appendFileSync(mdFilePath, markdownEntry, "utf8");
-
-      // রেসপন্স পাঠানো
-      if (fileExists) {
+      if (matchedFolders.length === 0) {
         await ctx.reply(
-          `ℹ️ **Note:** The \`prompts.md\` file already existed!\n\nThe new prompt has been appended to the existing file list:\n\`${mdFilePath}\``,
+          `⚠️ No matching folders found globally for "*${keyword}*".`,
           { parse_mode: "Markdown" },
         );
       } else {
-        await ctx.reply(
-          `✅ **Success!**\n\nA new \`prompts.md\` file has been created and the prompt was added:\n\`${mdFilePath}\``,
-          { parse_mode: "Markdown" },
-        );
+        let responseText = `📂 *Global Search Results (${matchedFolders.length}):*\n\n`;
+        matchedFolders.forEach((folder, index) => {
+          responseText += `${index + 1}. \`${folder}\`\n`;
+        });
+        await ctx.reply(responseText, { parse_mode: "Markdown" });
       }
     } catch (error) {
       console.error(error);
@@ -104,11 +167,11 @@ bot.on("message", async (ctx) => {
   }
 });
 
-// বট চালু করা এবং স্টার্টআপ মেসেজ পাঠানো
 async function start() {
+  console.log("Starting bot...");
   await sendStartupMessage();
-  console.log("Bot is polling for updates...");
-  await run(bot); // Managed runner (Graceful Ctrl-C support)
+  console.log("Bot polling started...");
+  await run(bot);
 }
 
 start();
