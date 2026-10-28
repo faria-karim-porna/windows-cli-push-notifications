@@ -30,14 +30,24 @@ try {
   fs.writeFileSync(logFile, "", "utf8");
 } catch (e) {}
 
-// Spawn pseudo terminal using cmd.exe
-const ptyProcess = pty.spawn("cmd.exe", ["/c", command, ...args], {
-  name: "xterm-color",
-  cols: process.stdout.columns || 80,
-  rows: process.stdout.rows || 30,
-  cwd: process.cwd(),
-  env: process.env,
-});
+// Git Bash er path (jodi standard path-e Git thake) ebong bash.exe spawn kora
+const bashPath = "C:\\Program Files\\Git\\bin\\bash.exe";
+const shellToUse = fs.existsSync(bashPath) ? bashPath : "cmd.exe";
+
+// Spawn pseudo terminal (Git Bash / Bash or fallback to cmd.exe)
+const ptyProcess = pty.spawn(
+  shellToUse,
+  shellToUse.includes("bash.exe")
+    ? ["-c", `${command} ${args.join(" ")}`]
+    : ["/c", command, ...args],
+  {
+    name: "xterm-color",
+    cols: process.stdout.columns || 80,
+    rows: process.stdout.rows || 30,
+    cwd: process.cwd(),
+    env: process.env,
+  },
+);
 
 // LIVE LOGGING: Write output to the specific log file and render to screen
 ptyProcess.onData((data) => {
