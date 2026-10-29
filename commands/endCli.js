@@ -12,7 +12,7 @@ export function registerEndCliCommand(bot, userStates) {
 
     await ctx.reply(
       "🛑 *Step 1/2:* Please provide the project directory path where the CLI session is running:",
-      { parse_mode: "Markdown" }
+      { parse_mode: "Markdown" },
     );
   });
 }
@@ -22,7 +22,10 @@ export async function handleEndCliFlow(ctx, chatId, text, state, userStates) {
     const dirPath = text.trim();
 
     if (!fs.existsSync(dirPath)) {
-      await ctx.reply(`❌ Error: The directory \`${dirPath}\` does not exist!`, { parse_mode: "Markdown" });
+      await ctx.reply(
+        `❌ Error: The directory \`${dirPath}\` does not exist!`,
+        { parse_mode: "Markdown" },
+      );
       userStates.delete(chatId);
       return;
     }
@@ -33,20 +36,29 @@ export async function handleEndCliFlow(ctx, chatId, text, state, userStates) {
 
     await ctx.reply(
       "⚙️ *Step 2/2:* Which CLI session do you want to end? Please reply with either `agy`, `freebuff`, or `all`:",
-      { parse_mode: "Markdown" }
+      { parse_mode: "Markdown" },
     );
-  } 
-  else if (state.step === "WAITING_FOR_CLI_CHOICE") {
+  } else if (state.step === "WAITING_FOR_CLI_CHOICE") {
     const cliChoice = text.trim().toLowerCase();
     const dirPath = state.dirPath;
     userStates.delete(chatId);
 
-    if (cliChoice !== "agy" && cliChoice !== "freebuff" && cliChoice !== "all") {
-      await ctx.reply(`❌ Invalid choice! Please reply with strictly `agy`, `freebuff`, or `all`.`, { parse_mode: "Markdown" });
+    if (
+      cliChoice !== "agy" &&
+      cliChoice !== "freebuff" &&
+      cliChoice !== "all"
+    ) {
+      await ctx.reply(
+        "❌ Invalid choice! Please reply with strictly `agy`, `freebuff`, or `all`.",
+        { parse_mode: "Markdown" },
+      );
       return;
     }
 
-    await ctx.reply(`🛑 Attempting to terminate \`${cliChoice}\` CLI sessions associated with \`${dirPath}\`... Please wait.`, { parse_mode: "Markdown" });
+    await ctx.reply(
+      `🛑 Attempting to terminate \`${cliChoice}\` CLI sessions associated with \`${dirPath}\`... Please wait.`,
+      { parse_mode: "Markdown" },
+    );
 
     try {
       let terminatedCount = 0;
@@ -68,16 +80,17 @@ export async function handleEndCliFlow(ctx, chatId, text, state, userStates) {
 
       // ব্যাকআপ হিসেবে রানিং নোড বা টার্মিনাল প্রসেস যা ওই ফোল্ডারে কাজ করছে তা ক্লিয়ার করার জন্য
       try {
-        await execAsync(`taskkill /f /fi "WORKINGDIR eq ${dirPath}"`, { cwd: dirPath });
+        await execAsync(`taskkill /f /fi "WORKINGDIR eq ${dirPath}"`, {
+          cwd: dirPath,
+        });
       } catch (e) {}
 
       console.log(`[END_CLI] Terminated CLI sessions for: ${dirPath}`);
 
       await ctx.reply(
         `✅ *CLI Session Ended Successfully!*\n\n- **Directory:** \`${dirPath}\`\n- **Target:** \`${cliChoice}\`\n- **Status:** All matching active sessions have been forcefully closed.`,
-        { parse_mode: "Markdown" }
+        { parse_mode: "Markdown" },
       );
-
     } catch (error) {
       console.error(error);
       await ctx.reply(`❌ Error terminating CLI: ${error.message}`);

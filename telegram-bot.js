@@ -91,6 +91,10 @@ bot.on("message", async (ctx) => {
   const chatId = ctx.chat?.id || ctx.msg?.chat?.id;
   const text = ctx.msg?.text || ctx.update?.message?.text;
 
+  if (chatId.toString() !== OWNER_CHAT_ID.toString()) {
+    return;
+  }
+
   if (!chatId || !text) return;
   if (text.startsWith("/")) return;
 

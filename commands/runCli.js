@@ -13,17 +13,27 @@ export function registerRunCliCommand(bot, userStates) {
 
     await ctx.reply(
       "🚀 *Step 1/2:* Please provide the project directory path where your workspace is located (e.g., `C:\\Global-AI-Notifier`):",
-      { parse_mode: "Markdown" }
+      { parse_mode: "Markdown" },
     );
   });
 }
 
-export async function handleRunCliFlow(ctx, chatId, text, state, userStates, bot) {
+export async function handleRunCliFlow(
+  ctx,
+  chatId,
+  text,
+  state,
+  userStates,
+  bot,
+) {
   if (state.step === "WAITING_FOR_DIR") {
     const dirPath = text.trim();
 
     if (!fs.existsSync(dirPath)) {
-      await ctx.reply(`❌ Error: The directory \`${dirPath}\` does not exist!`, { parse_mode: "Markdown" });
+      await ctx.reply(
+        `❌ Error: The directory \`${dirPath}\` does not exist!`,
+        { parse_mode: "Markdown" },
+      );
       userStates.delete(chatId);
       return;
     }
@@ -36,21 +46,25 @@ export async function handleRunCliFlow(ctx, chatId, text, state, userStates, bot
     try {
       console.log(`[VSCODE] Opening VS Code in: ${dirPath}`);
       exec(`code .`, { cwd: dirPath });
-      await ctx.reply(`💻 VS Code has been opened in \`${dirPath}\`.`, { parse_mode: "Markdown" });
+      await ctx.reply(`💻 VS Code has been opened in \`${dirPath}\`.`, {
+        parse_mode: "Markdown",
+      });
     } catch (err) {
       console.error("Failed to open VS Code:", err);
     }
 
     await ctx.reply(
       "⚙️ *Step 2/2:* Which CLI tool do you want to use? Please reply with either `agy` or `freebuff`:",
-      { parse_mode: "Markdown" }
+      { parse_mode: "Markdown" },
     );
-  } 
-  else if (state.step === "WAITING_FOR_CLI") {
+  } else if (state.step === "WAITING_FOR_CLI") {
     const cliChoice = text.trim().toLowerCase();
 
     if (cliChoice !== "agy" && cliChoice !== "freebuff") {
-      await ctx.reply(`❌ Invalid choice! Please reply with strictly `agy` or `freebuff`.`, { parse_mode: "Markdown" });
+      await ctx.reply(
+        "❌ Invalid choice! Please reply with strictly `agy` or `freebuff`.",
+        { parse_mode: "Markdown" },
+      );
       return;
     }
 
@@ -60,13 +74,16 @@ export async function handleRunCliFlow(ctx, chatId, text, state, userStates, bot
     const mdFilePath = path.join(dirPath, "prompts.md");
 
     if (!fs.existsSync(mdFilePath)) {
-      await ctx.reply(`❌ Error: No \`prompts.md\` file found in \`${dirPath}\`!`, { parse_mode: "Markdown" });
+      await ctx.reply(
+        `❌ Error: No \`prompts.md\` file found in \`${dirPath}\`!`,
+        { parse_mode: "Markdown" },
+      );
       return;
     }
 
     await ctx.reply(
       `🤖 *Automation Started!*\n\n- **Directory:** \`${dirPath}\`\n- **CLI Tool:** \`${cliChoice}\`\n\nExecuting prompts one by one... Please wait.`,
-      { parse_mode: "Markdown" }
+      { parse_mode: "Markdown" },
     );
 
     // ব্যাকগ্রাউন্ড অটোমেশন লুপ রান করা
@@ -75,16 +92,23 @@ export async function handleRunCliFlow(ctx, chatId, text, state, userStates, bot
 }
 
 // প্রম্পট রিড, এক্সিকিউশন, কমিট এবং রিমুভ করার লুপ ফাংশন
-async function runAutomationLoop(ctx, chatId, dirPath, mdFilePath, cliChoice, bot) {
+async function runAutomationLoop(
+  ctx,
+  chatId,
+  dirPath,
+  mdFilePath,
+  cliChoice,
+  bot,
+) {
   try {
     while (true) {
       const fileContent = fs.readFileSync(mdFilePath, "utf8");
-      
+
       // prompts.md থেকে প্রম্পটগুলো পার্স করা (- **Prompt:** [text])
       const promptRegex = /- \*\*Prompt:\*\* (.*)/g;
       let match;
       const prompts = [];
-      
+
       while ((match = promptRegex.exec(fileContent)) !== null) {
         prompts.push(match[1].trim());
       }
@@ -100,7 +124,9 @@ async function runAutomationLoop(ctx, chatId, dirPath, mdFilePath, cliChoice, bo
       }
 
       const currentPrompt = prompts[0];
-      console.log(`[AUTOMATION] Executing prompt: "${currentPrompt}" using ${cliChoice}`);
+      console.log(
+        `[AUTOMATION] Executing prompt: "${currentPrompt}" using ${cliChoice}`,
+      );
 
       await bot.api.sendMessage({
         chat_id: chatId,
@@ -111,7 +137,10 @@ async function runAutomationLoop(ctx, chatId, dirPath, mdFilePath, cliChoice, bo
       // ১. নির্দিষ্ট CLI কমান্ড রান করা
       const cliCommand = `${cliChoice} "${currentPrompt}"`;
       try {
-        await execAsync(cliCommand, { cwd: dirPath, maxBuffer: 1024 * 1024 * 10 });
+        await execAsync(cliCommand, {
+          cwd: dirPath,
+          maxBuffer: 1024 * 1024 * 10,
+        });
         console.log(`[CLI SUCCESS] Prompt executed.`);
       } catch (cliErr) {
         console.error(`[CLI ERROR]:`, cliErr);
@@ -126,10 +155,15 @@ async function runAutomationLoop(ctx, chatId, dirPath, mdFilePath, cliChoice, bo
       console.log(`[GIT] Running git commit...`);
       try {
         const commitMsg = `feat(auto): completed prompt - ${currentPrompt.substring(0, 40)}`;
-        await execAsync(`git add . && git commit -m "${commitMsg}"`, { cwd: dirPath });
+        await execAsync(`git add . && git commit -m "${commitMsg}"`, {
+          cwd: dirPath,
+        });
         console.log(`[GIT SUCCESS] Committed successfully.`);
       } catch (gitErr) {
-        console.log(`[GIT INFO] Nothing to commit or git error:`, gitErr.message);
+        console.log(
+          `[GIT INFO] Nothing to commit or git error:`,
+          gitErr.message,
+        );
       }
 
       // ৩. prompts.md থেকে এক্সিকিউটেড প্রম্পটটি রিমুভ করা
