@@ -9,10 +9,15 @@ export async function searchFilesInDir(
   maxResults = 15,
   onProgress,
 ) {
-  if (results.length >= maxResults) return;
+  if (results.length >= maxResults) {
+    console.log(`[FILE SEARCH] Max results limit (${maxResults}) reached.`);
+    return;
+  }
 
   try {
+    console.log(`[FILE SEARCH] Reading directory: ${dir}`);
     const items = await fs.readdir(dir, { withFileTypes: true });
+
     for (const item of items) {
       if (results.length >= maxResults) break;
 
@@ -23,6 +28,7 @@ export async function searchFilesInDir(
       }
 
       if (item.isDirectory()) {
+        console.log(`[FILE SEARCH] Entering subdirectory: ${fullPath}`);
         try {
           await searchFilesInDir(
             fullPath,
@@ -31,9 +37,15 @@ export async function searchFilesInDir(
             maxResults,
             onProgress,
           );
-        } catch (subErr) {}
+        } catch (subErr) {
+          console.log(
+            `[FILE SEARCH ERROR] Skipped directory: ${fullPath} -> ${subErr.message}`,
+          );
+        }
       } else if (item.isFile()) {
+        console.log(`[FILE SCAN] Checking file: ${fullPath}`);
         if (item.name.toLowerCase().includes(keyword.toLowerCase())) {
+          console.log(`[FILE MATCH FOUND] 🎉 ${fullPath}`);
           results.push(fullPath);
           if (typeof onProgress === "function") {
             await onProgress();
@@ -41,7 +53,11 @@ export async function searchFilesInDir(
         }
       }
     }
-  } catch (err) {}
+  } catch (err) {
+    console.log(
+      `[FILE SEARCH ERROR] Could not read directory: ${dir} -> ${err.message}`,
+    );
+  }
 }
 
 // অ্যাসিনক্রোনাস গ্লোবাল ফোল্ডার সার্চ
@@ -52,10 +68,15 @@ export async function searchFoldersInDir(
   maxResults = 15,
   onProgress,
 ) {
-  if (results.length >= maxResults) return;
+  if (results.length >= maxResults) {
+    console.log(`[FOLDER SEARCH] Max results limit (${maxResults}) reached.`);
+    return;
+  }
 
   try {
+    console.log(`[FOLDER SEARCH] Reading directory: ${dir}`);
     const items = await fs.readdir(dir, { withFileTypes: true });
+
     for (const item of items) {
       if (results.length >= maxResults) break;
 
@@ -68,6 +89,8 @@ export async function searchFoldersInDir(
       const fullPath = path.join(dir, folderName);
 
       if (item.isDirectory()) {
+        console.log(`[LOOP SCAN] Checking folder: ${fullPath}`);
+
         if (folderName.toLowerCase().includes(keyword.toLowerCase())) {
           console.log(`[MATCH FOUND] 🎉 ${fullPath}`);
           results.push(fullPath);
@@ -85,10 +108,18 @@ export async function searchFoldersInDir(
             maxResults,
             onProgress,
           );
-        } catch (subErr) {}
+        } catch (subErr) {
+          console.log(
+            `[FOLDER SEARCH ERROR] Skipped sub-directory: ${fullPath} -> ${subErr.message}`,
+          );
+        }
       }
     }
-  } catch (err) {}
+  } catch (err) {
+    console.log(
+      `[FOLDER SEARCH ERROR] Unreadable directory: ${dir} -> ${err.message}`,
+    );
+  }
 }
 
 // ড্রাইভ চেক করার জন্য এটি সিঙ্ক্রোনাস রাখা নিরাপদ
@@ -96,15 +127,17 @@ export function getAllAvailableDrives() {
   const drives = [];
   const possibleLetters = ["C", "D", "E", "F", "G", "H", "I", "J"];
 
+  console.log("[DRIVE CHECK] Scanning available drives on 'This PC'...");
   for (const letter of possibleLetters) {
     const drivePath = `${letter}:\\`;
     try {
-      // fs (sync) ব্যবহার করা হচ্ছে শুধুমাত্র ড্রাইভ এক্সিস্টেন্স চেক করার জন্য
       if (fsSyncCheck(drivePath)) {
+        console.log(`[DRIVE DETECTED] Found drive: ${drivePath}`);
         drives.push(drivePath);
       }
     } catch (e) {}
   }
+  console.log(`[DRIVE CHECK COMPLETED] Total valid drives:`, drives);
   return drives;
 }
 

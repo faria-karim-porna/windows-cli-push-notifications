@@ -36,10 +36,9 @@ export async function handleSearchFolderFlow(
     } catch (e) {}
   };
 
-  await sendTyping();
-  const typingInterval = setInterval(sendTyping, 2000);
-
   try {
+    await sendTyping();
+
     await ctx.reply(
       `🔍 Searching globally across 'This PC' for folders matching "*${keyword}*"... Please wait.`,
       { parse_mode: "Markdown" },
@@ -57,7 +56,6 @@ export async function handleSearchFolderFlow(
       if (matchedFolders.length >= maxLimit) break;
       console.log(`[SCANNING DRIVE]: ${drive}`);
 
-      // 🔥 অ্যাসিনক্রোনাস সার্চ ফাংশন ব্যবহারের কারণে এখানে await ব্যবহার করা হলো
       await searchFoldersInDir(
         drive,
         keyword,
@@ -67,7 +65,6 @@ export async function handleSearchFolderFlow(
       );
     }
 
-    clearInterval(typingInterval);
     await sendTyping();
 
     console.log(
@@ -87,10 +84,7 @@ export async function handleSearchFolderFlow(
       await ctx.reply(responseText, { parse_mode: "Markdown" });
     }
   } catch (error) {
-    clearInterval(typingInterval);
     console.error(error);
     await ctx.reply(`❌ Error: ${error.message}`);
-  } finally {
-    clearInterval(typingInterval);
   }
 }
