@@ -4,14 +4,19 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-export function registerSwitchUserCommand(bot, userStates) {
+export function registerSwitchUserCommand(bot, userStates, activeOperations) {
   bot.command("switchuser", async (ctx) => {
     const chatId = ctx.chat.id;
     console.log(`[CMD] /switchuser triggered by ${chatId}`);
+
+    // অ্যাবোর্ট কন্ট্রোলার তৈরি করে একটিভ অপারেশনে রেজিস্টার করা
+    const controller = new AbortController();
+    activeOperations.set(chatId, { controller, commandName: "switchuser" });
+
     userStates.set(chatId, { command: "SWITCH_USER", step: "WAITING_FOR_DIR" });
 
     await ctx.reply(
-      "👤 *Step 1/2:* Please provide your project directory path where the CLI tool is configured:",
+      "👤 *Step 1/2:* Please provide your project directory path where the CLI tool is configured:\n*(Type /stop to cancel)*",
       { parse_mode: "Markdown" },
     );
   });
@@ -23,56 +28,80 @@ export async function handleSwitchUserFlow(
   text,
   state,
   userStates,
+  activeOperations,
 ) {
-  if (state.step === "WAITING_FOR_DIR") {
-    const dirPath = text.trim();
+  const operation = activeOperations?.get(chatId);
+  const signal = operation?.controller?.signal;
 
-    if (!fs.existsSync(dirPath)) {
-      await ctx.reply(
-        `❌ Error: The directory \`${dirPath}\` does not exist!`,
-        { parse_mode: "Markdown" },
-      );
-      userStates.delete(chatId);
-      return;
-    }
-
-    state.dirPath = dirPath;
-    state.step = "WAITING_FOR_CLI_CHOICE";
-    userStates.set(chatId, state);
-
-    await ctx.reply(
-      "⚙️ *Step 2/2:* Which CLI tool user do you want to switch? Please reply with either `agy` or `freebuff`:",
-      { parse_mode: "Markdown" },
-    );
-  } else if (state.step === "WAITING_FOR_CLI_CHOICE") {
-    const cliChoice = text.trim().toLowerCase();
-    const dirPath = state.dirPath;
+  if (signal && signal.aborted) {
     userStates.delete(chatId);
+    activeOperations?.delete(chatId);
+    return;
+  }
 
-    if (cliChoice !== "agy" && cliChoice !== "freebuff") {
+  try {
+    if (state.step === "WAITING_FOR_DIR") {
+      const dirPath = text.trim();
+
+      if (!fs.existsSync(dirPath)) {
+        userStates.delete(chatId);
+        activeOperations?.delete(chatId);
+        await ctx.reply(
+          `❌ Error: The directory \`${dirPath}\` does not exist!`,
+          { parse_mode: "Markdown" },
+        );
+        return;
+      }
+
+      state.dirPath = dirPath;
+      state.step = "WAITING_FOR_CLI_CHOICE";
+      userStates.set(chatId, state);
+
+      if (signal && signal.aborted) {
+        userStates.delete(chatId);
+        activeOperations?.delete(chatId);
+        return;
+      }
+
       await ctx.reply(
-        `❌ Invalid choice! Please reply with strictly \`agy\` or \`freebuff\`.`,
+        "⚙️ *Step 2/2:* Which CLI tool user do you want to switch? Please reply with either `agy` or `freebuff`:\n*(Type /stop to cancel)*",
         { parse_mode: "Markdown" },
       );
-      return;
-    }
+    } else if (state.step === "WAITING_FOR_CLI_CHOICE") {
+      const cliChoice = text.trim().toLowerCase();
+      const dirPath = state.dirPath;
 
-    await ctx.reply(
-      `🔄 Initiating user switch for \`${cliChoice}\` in \`${dirPath}\`...\n\nLogging out and opening Chrome for new login... Please check your browser.`,
-      { parse_mode: "Markdown" },
-    );
+      userStates.delete(chatId);
+      activeOperations?.delete(chatId);
 
-    try {
-      // ১. প্রথমে বর্তমান সেশন লগআউট বা ক্যাশ ক্লিয়ার করার কমান্ড রান করা
+      if (cliChoice !== "agy" && cliChoice !== "freebuff") {
+        await ctx.reply(
+          `❌ Invalid choice! Please reply with strictly \`agy\` or \`freebuff\`.`,
+          { parse_mode: "Markdown" },
+        );
+        return;
+      }
+
+      if (signal && signal.aborted) {
+        return;
+      }
+
+      await ctx.reply(
+        `🔄 Initiating user switch for \`${cliChoice}\` in \`${dirPath}\`...\n\nLogging out and opening Chrome for new login... Please check your browser.`,
+        { parse_mode: "Markdown" },
+      );
+
+      // ১. প্রথমে বর্তমান সেশন লগআউট বা ক্যাশ ক্লিয়ার করার কমান্ড রান করা
       try {
         await execAsync(`${cliChoice} logout`, { cwd: dirPath });
-      } catch (e) {
-        // যদি লগআউট কমান্ড সরাসরি না থাকে, লোকাল ক্রেডেনশিয়াল ফাইল ডিলিট করার ব্যবস্থা রাখা যায়
+      } catch (e) {}
+
+      if (signal && signal.aborted) {
+        return;
       }
 
       // ২. ক্রোম ব্রাউজার ব্যবহার করে নতুন ইউজার হিসেবে লগইন করার কমান্ড রান করা
-      // (বেশভাগ CLI টুলের ক্ষেত্রে 'login' কমান্ড ব্রাউজার বা ক্রোম ট্রিগার করে)
-      const { stdout, stderr } = await execAsync(`${cliChoice} login`, {
+      await execAsync(`${cliChoice} login`, {
         cwd: dirPath,
       });
 
@@ -81,14 +110,16 @@ export async function handleSwitchUserFlow(
       );
 
       await ctx.reply(
-        `✅ *User Switch Triggered Successfully!*\n\n- **CLI Tool:** \`${cliChoice}\`\n- **Status:** Previous session cleared. Please complete the login in the opened Chrome browser window.`,
+        `✅ *User Switch Triggered Successfully!*\n\n**CLI Tool:** \`${cliChoice}\`\n**Status:** Previous session cleared. Please complete the login in the opened Chrome browser window.`,
         { parse_mode: "Markdown" },
       );
-    } catch (error) {
-      console.error(error);
-      await ctx.reply(
-        `❌ Error switching user: ${error.message}\n\nMake sure Chrome is accessible and the CLI supports the login command.`,
-      );
     }
+  } catch (error) {
+    userStates.delete(chatId);
+    activeOperations?.delete(chatId);
+    console.error(error);
+    await ctx.reply(
+      `❌ Error switching user: ${error.message}\n\nMake sure Chrome is accessible and the CLI supports the login command.`,
+    );
   }
 }

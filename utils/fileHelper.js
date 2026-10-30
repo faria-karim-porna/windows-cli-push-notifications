@@ -1,16 +1,17 @@
 import fs from "fs/promises";
 import path from "path";
 
-// অ্যাসিনক্রোনাস গ্লোবাল ফাইল সার্চ
+// অ্যাসিনক্রোনাস গ্লোবাল ফাইল সার্চ (signal সহ)
 export async function searchFilesInDir(
   dir,
   keyword,
   results = [],
   maxResults = 15,
   onProgress,
+  signal,
 ) {
-  if (results.length >= maxResults) {
-    console.log(`[FILE SEARCH] Max results limit (${maxResults}) reached.`);
+  if (results.length >= maxResults || (signal && signal.aborted)) {
+    console.log(`[FILE SEARCH] Stopped or max results limit reached.`);
     return;
   }
 
@@ -19,7 +20,7 @@ export async function searchFilesInDir(
     const items = await fs.readdir(dir, { withFileTypes: true });
 
     for (const item of items) {
-      if (results.length >= maxResults) break;
+      if (results.length >= maxResults || (signal && signal.aborted)) break;
 
       const fullPath = path.join(dir, item.name);
 
@@ -36,6 +37,7 @@ export async function searchFilesInDir(
             results,
             maxResults,
             onProgress,
+            signal,
           );
         } catch (subErr) {
           console.log(
@@ -43,6 +45,7 @@ export async function searchFilesInDir(
           );
         }
       } else if (item.isFile()) {
+        if (signal && signal.aborted) break;
         console.log(`[FILE SCAN] Checking file: ${fullPath}`);
         if (item.name.toLowerCase().includes(keyword.toLowerCase())) {
           console.log(`[FILE MATCH FOUND] 🎉 ${fullPath}`);
@@ -60,16 +63,17 @@ export async function searchFilesInDir(
   }
 }
 
-// অ্যাসিনক্রোনাস গ্লোবাল ফোল্ডার সার্চ
+// অ্যাসিনক্রোনাস গ্লোবাল ফোল্ডার সার্চ (signal সহ)
 export async function searchFoldersInDir(
   dir,
   keyword,
   results = [],
   maxResults = 15,
   onProgress,
+  signal,
 ) {
-  if (results.length >= maxResults) {
-    console.log(`[FOLDER SEARCH] Max results limit (${maxResults}) reached.`);
+  if (results.length >= maxResults || (signal && signal.aborted)) {
+    console.log(`[FOLDER SEARCH] Stopped or max results limit reached.`);
     return;
   }
 
@@ -78,7 +82,7 @@ export async function searchFoldersInDir(
     const items = await fs.readdir(dir, { withFileTypes: true });
 
     for (const item of items) {
-      if (results.length >= maxResults) break;
+      if (results.length >= maxResults || (signal && signal.aborted)) break;
 
       // প্রতি লুপে টাইপিং স্ট্যাটাস সচল রাখতে প্রোগ্রেস কল করা
       if (typeof onProgress === "function") {
@@ -89,6 +93,7 @@ export async function searchFoldersInDir(
       const fullPath = path.join(dir, folderName);
 
       if (item.isDirectory()) {
+        if (signal && signal.aborted) break;
         console.log(`[LOOP SCAN] Checking folder: ${fullPath}`);
 
         if (folderName.toLowerCase().includes(keyword.toLowerCase())) {
@@ -107,6 +112,7 @@ export async function searchFoldersInDir(
             results,
             maxResults,
             onProgress,
+            signal,
           );
         } catch (subErr) {
           console.log(

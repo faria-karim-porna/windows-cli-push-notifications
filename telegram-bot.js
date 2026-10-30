@@ -47,13 +47,15 @@ import {
 import {
   registerCurrentUserCommand,
   handleCurrentUserFlow,
-} from "./commands/currentUser.js"; // নতুন ইম্পোর্ট
+} from "./commands/currentUser.js";
+import { registerStopCommand } from "./commands/stop.js";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
 
 const bot = new Bot(TOKEN);
 const userStates = new Map();
+const activeOperations = new Map(); // সেন্ট্রাল ম্যাপ যা সব চলমান অপারেশন ট্র্যাক করবে
 
 async function sendStartupMessage() {
   try {
@@ -84,7 +86,8 @@ registerSwitchModelCommand(bot, userStates);
 registerSwitchModelCallback(bot);
 registerCurrentUsageCommand(bot, userStates);
 registerSwitchUserCommand(bot, userStates);
-registerCurrentUserCommand(bot, userStates); // নতুন রেজিস্টার
+registerCurrentUserCommand(bot, userStates);
+registerStopCommand(bot, activeOperations); // /stop কমান্ড রেজিস্টার করা হলো
 
 // সেন্ট্রাল মেসেজ লিসেনার
 bot.on("message", async (ctx) => {
@@ -101,30 +104,116 @@ bot.on("message", async (ctx) => {
   const state = userStates.get(chatId);
   if (!state) return;
 
+  // প্রতিটি ফ্লো হ্যান্ডলারে activeOperations পাস করা হয়েছে যাতে দরকার পড়লে /stop দিয়ে থামানো যায়
   if (state.command === "ADD_PROMPT") {
-    await handleAddPromptFlow(ctx, chatId, text, state, userStates);
+    await handleAddPromptFlow(
+      ctx,
+      chatId,
+      text,
+      state,
+      userStates,
+      activeOperations,
+    );
   } else if (state.command === "SEARCH_FOLDER") {
-    await handleSearchFolderFlow(ctx, chatId, text, userStates, bot);
+    await handleSearchFolderFlow(
+      ctx,
+      chatId,
+      text,
+      userStates,
+      bot,
+      activeOperations,
+    );
   } else if (state.command === "SEARCH_FILE") {
-    await handleSearchFileFlow(ctx, chatId, text, userStates, bot);
+    await handleSearchFileFlow(
+      ctx,
+      chatId,
+      text,
+      userStates,
+      bot,
+      activeOperations,
+    );
   } else if (state.command === "UPDATE_PROMPT") {
-    await handleUpdatePromptFlow(ctx, chatId, text, state, userStates);
+    await handleUpdatePromptFlow(
+      ctx,
+      chatId,
+      text,
+      state,
+      userStates,
+      activeOperations,
+    );
   } else if (state.command === "RUN_CLI") {
-    await handleRunCliFlow(ctx, chatId, text, state, userStates, bot);
+    await handleRunCliFlow(
+      ctx,
+      chatId,
+      text,
+      state,
+      userStates,
+      bot,
+      activeOperations,
+    );
   } else if (state.command === "CURRENT_CLI") {
-    await handleCurrentCliFlow(ctx, chatId, text, userStates);
+    await handleCurrentCliFlow(
+      ctx,
+      chatId,
+      text,
+      state,
+      userStates,
+      activeOperations,
+    );
   } else if (state.command === "END_CLI") {
-    await handleEndCliFlow(ctx, chatId, text, state, userStates);
+    await handleEndCliFlow(
+      ctx,
+      chatId,
+      text,
+      state,
+      userStates,
+      activeOperations,
+    );
   } else if (state.command === "CLOSE_CODE") {
-    await handleCloseCodeFlow(ctx, chatId, text, userStates);
+    await handleCloseCodeFlow(
+      ctx,
+      chatId,
+      text,
+      state,
+      userStates,
+      activeOperations,
+    );
   } else if (state.command === "SWITCH_MODEL") {
-    await handleSwitchModelFlow(ctx, chatId, text, state, userStates);
+    await handleSwitchModelFlow(
+      ctx,
+      chatId,
+      text,
+      state,
+      userStates,
+      activeOperations,
+    );
   } else if (state.command === "CURRENT_USAGE") {
-    await handleCurrentUsageFlow(ctx, chatId, text, userStates);
+    await handleCurrentUsageFlow(
+      ctx,
+      chatId,
+      text,
+      state,
+      userStates,
+      activeOperations,
+    );
   } else if (state.command === "SWITCH_USER") {
-    await handleSwitchUserFlow(ctx, chatId, text, state, userStates);
+    await handleSwitchUserFlow(
+      ctx,
+      chatId,
+      text,
+      state,
+      userStates,
+      activeOperations,
+    );
   } else if (state.command === "CURRENT_USER") {
-    await handleCurrentUserFlow(ctx, chatId, text, userStates); // নতুন ফ্লো হ্যান্ডলার
+    await handleCurrentUserFlow(
+      ctx,
+      chatId,
+      text,
+      state,
+      userStates,
+      activeOperations,
+    );
   }
 });
 

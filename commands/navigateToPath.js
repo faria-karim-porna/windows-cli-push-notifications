@@ -61,10 +61,14 @@ function getDirectoryKeyboard(currentPath) {
   return { inline_keyboard: inlineKeyboard };
 }
 
-export function registerNavigatePathCommand(bot, userStates) {
+export function registerNavigatePathCommand(bot, userStates, activeOperations) {
   bot.command("navigatetopath", async (ctx) => {
     const chatId = ctx.chat.id;
     console.log(`[CMD] /navigatetopath triggered by chat ID: ${chatId}`);
+
+    // অ্যাবোর্ট কন্ট্রোলার তৈরি করে একটিভ অপারেশনে রেজিস্টার করা
+    const controller = new AbortController();
+    activeOperations.set(chatId, { controller, commandName: "navigatetopath" });
 
     const drives = [];
     const possibleLetters = ["C", "D", "E", "F", "G", "H"];
@@ -91,23 +95,36 @@ export function registerNavigatePathCommand(bot, userStates) {
     ]);
     inlineKeyboard.push([{ text: "❌ Exit", callback_data: `nav_exit` }]);
 
-    await ctx.reply("🗂️ *Please select a drive to start navigation:*", {
-      parse_mode: "Markdown",
-      reply_markup: { inline_keyboard: inlineKeyboard },
-    });
+    await ctx.reply(
+      "🗂️ *Please select a drive to start navigation:*\n*(Type /stop to cancel)*",
+      {
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: inlineKeyboard },
+      },
+    );
     console.log(`[NAV_DRIVES] Drive selection menu sent to chat ID: ${chatId}`);
   });
 }
 
 // ইনলাইন বাটন ক্লিক হ্যান্ডেল করার জন্য কলব্যাক কুয়েরি লিসেনার
-export function registerNavigateCallback(bot) {
+export function registerNavigateCallback(bot, activeOperations) {
   bot.on("callback_query", async (query) => {
     console.log("[RAW_CALLBACK_QUERY_EVENT]", JSON.stringify(query, null, 2));
 
-    // সঠিক পাথ থেকে callback_query অবজেক্ট এবং ডেটা এক্সট্র্যাক্ট করা
     const callbackQuery = query.update?.callback_query || query;
     const chatId = callbackQuery.message?.chat?.id || callbackQuery.from?.id;
     const data = callbackQuery.data;
+
+    // যদি অপারেশন অ্যাবোর্ট বা স্টপ করা হয়ে থাকে
+    const operation = activeOperations?.get(chatId);
+    if (operation && operation.controller.signal.aborted) {
+      activeOperations.delete(chatId);
+      await bot.api.answerCallbackQuery({
+        callback_query_id: callbackQuery.id,
+        text: "Navigation was stopped.",
+      });
+      return;
+    }
 
     if (!data || typeof data !== "string") {
       console.log(
@@ -128,6 +145,7 @@ export function registerNavigateCallback(bot) {
     try {
       if (data === "nav_exit") {
         console.log(`[NAV_EXIT] User exited navigation.`);
+        activeOperations?.delete(chatId);
         if (callbackQuery.message) {
           await bot.api.editMessageText({
             chat_id: chatId,
@@ -145,6 +163,7 @@ export function registerNavigateCallback(bot) {
       if (data.startsWith("nav_select:")) {
         const selectedPath = data.replace("nav_select:", "");
         console.log(`[NAV_SELECT] Path selected by user: ${selectedPath}`);
+        activeOperations?.delete(chatId);
         if (callbackQuery.message) {
           await bot.api.editMessageText({
             chat_id: chatId,
@@ -195,6 +214,7 @@ export function registerNavigateCallback(bot) {
         });
       }
     } catch (error) {
+      activeOperations?.delete(chatId);
       console.error("[NAV_ERROR] Navigation callback error occurred:", error);
       try {
         await bot.api.answerCallbackQuery({

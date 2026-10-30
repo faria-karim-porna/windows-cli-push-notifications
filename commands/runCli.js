@@ -5,14 +5,19 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-export function registerRunCliCommand(bot, userStates) {
+export function registerRunCliCommand(bot, userStates, activeOperations) {
   bot.command("runcli", async (ctx) => {
     const chatId = ctx.chat.id;
     console.log(`[CMD] /runcli triggered by ${chatId}`);
+
+    // অ্যাবোর্ট কন্ট্রোলার তৈরি করে একটিভ অপারেশনে রেজিস্টার করা
+    const controller = new AbortController();
+    activeOperations.set(chatId, { controller, commandName: "runcli" });
+
     userStates.set(chatId, { command: "RUN_CLI", step: "WAITING_FOR_DIR" });
 
     await ctx.reply(
-      "🚀 *Step 1/2:* Please provide the project directory path where your workspace is located (e.g., `C:\\Global-AI-Notifier`):",
+      "🚀 *Step 1/2:* Please provide the project directory path where your workspace is located (e.g., `C:\\Global-AI-Notifier`):\n*(Type /stop to cancel)*",
       { parse_mode: "Markdown" },
     );
   });
@@ -25,16 +30,27 @@ export async function handleRunCliFlow(
   state,
   userStates,
   bot,
+  activeOperations,
 ) {
+  const operation = activeOperations?.get(chatId);
+  const signal = operation?.controller?.signal;
+
+  if (signal && signal.aborted) {
+    userStates.delete(chatId);
+    activeOperations?.delete(chatId);
+    return;
+  }
+
   if (state.step === "WAITING_FOR_DIR") {
     const dirPath = text.trim();
 
     if (!fs.existsSync(dirPath)) {
+      userStates.delete(chatId);
+      activeOperations?.delete(chatId);
       await ctx.reply(
         `❌ Error: The directory \`${dirPath}\` does not exist!`,
         { parse_mode: "Markdown" },
       );
-      userStates.delete(chatId);
       return;
     }
 
@@ -42,7 +58,13 @@ export async function handleRunCliFlow(
     state.step = "WAITING_FOR_CLI";
     userStates.set(chatId, state);
 
-    // ইউজার ডিরেক্টরি দেওয়ার সাথে সাথে VS Code ওপেন করে দেওয়া
+    if (signal && signal.aborted) {
+      userStates.delete(chatId);
+      activeOperations?.delete(chatId);
+      return;
+    }
+
+    // ইউজার ডিরেক্টরি দেওয়ার সাথে সাথে VS Code ওপেন করে দেওয়া
     try {
       console.log(`[VSCODE] Opening VS Code in: ${dirPath}`);
       exec(`code .`, { cwd: dirPath });
@@ -54,7 +76,7 @@ export async function handleRunCliFlow(
     }
 
     await ctx.reply(
-      "⚙️ *Step 2/2:* Which CLI tool do you want to use? Please reply with either `agy` or `freebuff`:",
+      "⚙️ *Step 2/2:* Which CLI tool do you want to use? Please reply with either `agy` or `freebuff`:\n*(Type /stop to cancel)*",
       { parse_mode: "Markdown" },
     );
   } else if (state.step === "WAITING_FOR_CLI") {
@@ -69,11 +91,12 @@ export async function handleRunCliFlow(
     }
 
     const dirPath = state.dirPath;
-    userStates.delete(chatId); // স্টেট ক্লিয়ার করে অটোমেশন লুপ শুরু করছি
+    userStates.delete(chatId);
 
     const mdFilePath = path.join(dirPath, "prompts.md");
 
     if (!fs.existsSync(mdFilePath)) {
+      activeOperations?.delete(chatId);
       await ctx.reply(
         `❌ Error: No \`prompts.md\` file found in \`${dirPath}\`!`,
         { parse_mode: "Markdown" },
@@ -82,12 +105,20 @@ export async function handleRunCliFlow(
     }
 
     await ctx.reply(
-      `🤖 *Automation Started!*\n\n- **Directory:** \`${dirPath}\`\n- **CLI Tool:** \`${cliChoice}\`\n\nExecuting prompts one by one... Please wait.`,
+      `🤖 *Automation Started!*\n\n**Directory:** \`${dirPath}\`\n**CLI Tool:** \`${cliChoice}\`\n\nExecuting prompts one by one... (Send /stop to cancel)`,
       { parse_mode: "Markdown" },
     );
 
-    // ব্যাকগ্রাউন্ড অটোমেশন লুপ রান করা
-    runAutomationLoop(ctx, chatId, dirPath, mdFilePath, cliChoice, bot);
+    // ব্যাকগ্রাউন্ড অটোমেশন লুপ রান করা (signal সহ)
+    runAutomationLoop(
+      ctx,
+      chatId,
+      dirPath,
+      mdFilePath,
+      cliChoice,
+      bot,
+      activeOperations,
+    );
   }
 }
 
@@ -99,9 +130,25 @@ async function runAutomationLoop(
   mdFilePath,
   cliChoice,
   bot,
+  activeOperations,
 ) {
+  const operation = activeOperations?.get(chatId);
+  const signal = operation?.controller?.signal;
+
   try {
     while (true) {
+      // প্রতিটি লুপের শুরুতে চেক করা যে ইউজার /stop দিয়েছে কিনা
+      if (signal && signal.aborted) {
+        console.log(`[AUTOMATION] Stopped by user request for chat: ${chatId}`);
+        activeOperations?.delete(chatId);
+        await bot.api.sendMessage({
+          chat_id: chatId,
+          text: `🛑 *Automation has been successfully stopped by user.*`,
+          parse_mode: "Markdown",
+        });
+        break;
+      }
+
       const fileContent = fs.readFileSync(mdFilePath, "utf8");
 
       // prompts.md থেকে প্রম্পটগুলো পার্স করা (- **Prompt:** [text])
@@ -115,6 +162,7 @@ async function runAutomationLoop(
 
       if (prompts.length === 0) {
         console.log(`[AUTOMATION] prompts.md is now empty. Task completed.`);
+        activeOperations?.delete(chatId);
         await bot.api.sendMessage({
           chat_id: chatId,
           text: `🎉 *All prompts from \`prompts.md\` have been successfully executed and committed!*`,
@@ -122,6 +170,8 @@ async function runAutomationLoop(
         });
         break;
       }
+
+      if (signal && signal.aborted) break;
 
       const currentPrompt = prompts[0];
       console.log(
@@ -151,6 +201,8 @@ async function runAutomationLoop(
         });
       }
 
+      if (signal && signal.aborted) break;
+
       // ২. গিট কমিট রান করা
       console.log(`[GIT] Running git commit...`);
       try {
@@ -170,10 +222,14 @@ async function runAutomationLoop(
       removeFirstPromptFromFile(mdFilePath);
       console.log(`[FILE] Removed completed prompt from prompts.md`);
 
-      // পরবর্তী প্রম্পটে যাওয়ার আগে ছোট একটি বিরতি
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // পরবর্তী প্রম্পটে যাওয়ার আগে ছোট একটি বিরতি (সাথে অ্যাবোর্ট চেক)
+      for (let i = 0; i < 20; i++) {
+        if (signal && signal.aborted) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
     }
   } catch (error) {
+    activeOperations?.delete(chatId);
     console.error(`[AUTOMATION ERROR]:`, error);
     await bot.api.sendMessage({
       chat_id: chatId,
@@ -186,14 +242,11 @@ async function runAutomationLoop(
 // ফাইল থেকে প্রথম প্রম্পট ব্লকটি ডিলিট করার হেল্পার ফাংশন
 function removeFirstPromptFromFile(filePath) {
   let content = fs.readFileSync(filePath, "utf8");
-  // প্রথম প্রম্পট এন্টি্রিটি রিমুভ করার জন্য স্প্লিট ও স্লাইস ব্যবহার করা হলো
   const parts = content.split(/- \*\*Time:\*\*/);
   if (parts.length > 2) {
-    // প্রথম অংশ হেডার বা খালি থাকতে পারে, পরের অংশগুলো প্রম্পট ব্লক
     parts.splice(1, 1);
     fs.writeFileSync(filePath, parts.join("- **Time:**"), "utf8");
   } else {
-    // যদি একটিই প্রম্পট থাকে তবে ফাইল পুরো খালি করে দেওয়া
     fs.writeFileSync(filePath, "", "utf8");
   }
 }

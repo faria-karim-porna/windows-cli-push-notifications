@@ -5,24 +5,44 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-export function registerCurrentCliCommand(bot, userStates) {
+export function registerCurrentCliCommand(bot, userStates, activeOperations) {
   bot.command("currentcli", async (ctx) => {
     const chatId = ctx.chat.id;
     console.log(`[CMD] /currentcli triggered by ${chatId}`);
+
+    // অ্যাবোর্ট কন্ট্রোলার তৈরি করে একটিভ অপারেশনে রেজিস্টার করা
+    const controller = new AbortController();
+    activeOperations.set(chatId, { controller, commandName: "currentcli" });
+
     userStates.set(chatId, { command: "CURRENT_CLI" });
 
     await ctx.reply(
-      "🔍 Please provide your project directory path to check which CLI (`agy` or `freebuff`) is active/installed or configured:",
+      "🔍 Please provide your project directory path to check which CLI (`agy` or `freebuff`) is active/installed or configured:\n*(Type /stop to cancel)*",
       { parse_mode: "Markdown" },
     );
   });
 }
 
-export async function handleCurrentCliFlow(ctx, chatId, text, userStates) {
+export async function handleCurrentCliFlow(
+  ctx,
+  chatId,
+  text,
+  userStates,
+  activeOperations,
+) {
   const dirPath = text.trim();
   userStates.delete(chatId);
 
+  const operation = activeOperations?.get(chatId);
+  const signal = operation?.controller?.signal;
+
+  if (signal && signal.aborted) {
+    activeOperations.delete(chatId);
+    return;
+  }
+
   if (!fs.existsSync(dirPath)) {
+    activeOperations?.delete(chatId);
     await ctx.reply(`❌ Error: The directory \`${dirPath}\` does not exist!`, {
       parse_mode: "Markdown",
     });
@@ -35,8 +55,12 @@ export async function handleCurrentCliFlow(ctx, chatId, text, userStates) {
   );
 
   try {
+    if (signal && signal.aborted) {
+      activeOperations.delete(chatId);
+      return;
+    }
+
     let activeCli = "Unknown / Not Configured";
-    let details = "";
 
     // ১. প্রজেক্টের package.json বা কোনো লোকাল কনফিগ ফাইল চেক করা
     const packageJsonPath = path.join(dirPath, "package.json");
@@ -54,7 +78,12 @@ export async function handleCurrentCliFlow(ctx, chatId, text, userStates) {
       }
     }
 
-    // ২. যদি package.json এ সরাসরি না পাওয়া যায়, তবে গ্লোবাল কমান্ড চ্যারেক্টার চেক করা (agy --version / freebuff --version)
+    if (signal && signal.aborted) {
+      activeOperations.delete(chatId);
+      return;
+    }
+
+    // ২. যদি package.json এ সরাসরি না পাওয়া যায়, তবে গ্লোবাল কমান্ড চেক করা
     if (activeCli === "Unknown / Not Configured") {
       try {
         await execAsync(`freebuff --version`, { cwd: dirPath });
@@ -67,11 +96,14 @@ export async function handleCurrentCliFlow(ctx, chatId, text, userStates) {
       }
     }
 
+    activeOperations?.delete(chatId);
+
     await ctx.reply(
-      `📊 *CLI Status Report*\n\n- **Project Directory:** \`${dirPath}\`\n- **Detected CLI:** \`${activeCli}\``,
+      `📊 *CLI Status Report*\n\n**Project Directory:** \`${dirPath}\`\n**Detected CLI:** \`${activeCli}\``,
       { parse_mode: "Markdown" },
     );
   } catch (error) {
+    activeOperations?.delete(chatId);
     console.error(error);
     await ctx.reply(`❌ Error checking CLI: ${error.message}`);
   }

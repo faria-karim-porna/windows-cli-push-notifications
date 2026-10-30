@@ -1,14 +1,19 @@
 import fs from "fs";
 import path from "path";
 
-export function registerAddPromptCommand(bot, userStates) {
+export function registerAddPromptCommand(bot, userStates, activeOperations) {
   bot.command("addprompt", async (ctx) => {
     const chatId = ctx.chat.id;
     console.log(`[CMD] /addprompt triggered by ${chatId}`);
+
+    // অ্যাবোর্ট কন্ট্রোলার তৈরি করে একটিভ অপারেশনে রেজিস্টার করা
+    const controller = new AbortController();
+    activeOperations.set(chatId, { controller, commandName: "addprompt" });
+
     userStates.set(chatId, { command: "ADD_PROMPT", step: "WAITING_FOR_DIR" });
 
     await ctx.reply(
-      "📂 *Step 1/2:* Please provide the target directory path (e.g., `C:\\Global-AI-Notifier`):",
+      "📂 *Step 1/2:* Please provide the target directory path (e.g., `C:\\Global-AI-Notifier`):\n*(Type /stop to cancel)*",
       { parse_mode: "Markdown" },
     );
   });
@@ -20,22 +25,35 @@ export async function handleAddPromptFlow(
   text,
   state,
   userStates,
+  activeOperations,
 ) {
-  if (state.step === "WAITING_FOR_DIR") {
-    state.dirPath = text.trim();
-    state.step = "WAITING_FOR_PROMPT";
-    userStates.set(chatId, state);
-
-    await ctx.reply(
-      "✍️ *Step 2/2:* Great! Now please provide your prompt text:",
-      { parse_mode: "Markdown" },
-    );
-  } else if (state.step === "WAITING_FOR_PROMPT") {
-    const dirPath = state.dirPath;
-    const promptText = text.trim();
+  // অপারেশন চলাকালীন অ্যাবোর্ট চেক করা
+  const operation = activeOperations?.get(chatId);
+  if (operation && operation.controller.signal.aborted) {
     userStates.delete(chatId);
+    activeOperations.delete(chatId);
+    return;
+  }
 
-    try {
+  try {
+    if (state.step === "WAITING_FOR_DIR") {
+      state.dirPath = text.trim();
+      state.step = "WAITING_FOR_PROMPT";
+      userStates.set(chatId, state);
+
+      await ctx.reply(
+        "✍️ *Step 2/2:* Great! Now please provide your prompt text:\n*(Type /stop to cancel)*",
+        { parse_mode: "Markdown" },
+      );
+    } else if (state.step === "WAITING_FOR_PROMPT") {
+      const dirPath = state.dirPath;
+      const promptText = text.trim();
+
+      userStates.delete(chatId);
+      if (activeOperations) {
+        activeOperations.delete(chatId);
+      }
+
       if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
       }
@@ -57,9 +75,13 @@ export async function handleAddPromptFlow(
           { parse_mode: "Markdown" },
         );
       }
-    } catch (error) {
-      console.error(error);
-      await ctx.reply(`❌ Error: ${error.message}`);
     }
+  } catch (error) {
+    userStates.delete(chatId);
+    if (activeOperations) {
+      activeOperations.delete(chatId);
+    }
+    console.error(error);
+    await ctx.reply(`❌ Error: ${error.message}`);
   }
 }
